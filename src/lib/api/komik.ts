@@ -103,15 +103,22 @@ function listCards($: CheerioAPI) {
       .map((_, a) => chapterRef($(a)))
       .get()
       .filter(Boolean);
+    // .judul2 berisi judul alternatif (pencarian) atau "Genre | 6 jam lalu | Berwarna" (pustaka).
+    const sub = clean(el.find(".judul2").first().text());
+    const meta = sub.includes("|") ? sub.split("|").map((x) => x.trim()) : [];
+    const description = clean(el.find(".kan p").first().text());
+    const updated = meta.find((x) => /lalu|baru/i.test(x)) ?? description.match(/^Update\s+(.+?)\.?$/i)?.[1] ?? null;
     out.push({
       title: clean(el.find("h3").first().text()),
-      alternative_title: clean(el.find(".judul2").first().text()) || null,
+      alternative_title: meta.length ? null : sub || null,
       slug,
       url: mangaUrl(slug),
       thumbnail: cover($, el),
       type,
       genre,
-      description: clean(el.find(".kan p").first().text()) || null,
+      updated,
+      colored: meta.length ? meta.some((x) => /berwarna/i.test(x)) : null,
+      description: description && !/^Update\s/i.test(description) ? description : null,
       first_chapter: chapters[0] ?? null,
       latest_chapter: chapters.length > 1 ? chapters[chapters.length - 1] : null,
     });
