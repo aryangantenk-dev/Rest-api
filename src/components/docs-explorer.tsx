@@ -15,6 +15,7 @@ type Result = {
   type: string;
   text?: string;
   img?: string;
+  frame?: string;
   size?: number;
   error?: string;
 };
@@ -87,7 +88,8 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
         } catch {
           /* bukan JSON */
         }
-        setRes({ ok: r.ok, status: r.status, ms, type, text, size: raw.length });
+        const frame = r.ok && type.startsWith("text/html") ? `${e.path}${query}` : undefined;
+        setRes({ ok: r.ok, status: r.status, ms, type, text, frame, size: raw.length });
       }
     } catch {
       setRes({ ok: false, status: 0, ms: Math.round(performance.now() - t0), type: "", error: "Tidak dapat terhubung ke server." });
@@ -119,7 +121,8 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
             </span>
             <span className="mt-1 line-clamp-2 text-[13px] leading-snug text-muted sm:line-clamp-1">{e.description}</span>
           </span>
-          {e.kind === "image" && <span className="hidden rounded-full border border-line px-2.5 py-1 font-mono text-[10px] text-dim sm:block">image/png</span>}
+          {e.kind === "image" && <span className="hidden rounded-full border border-line px-2.5 py-1 font-mono text-[10px] text-dim sm:block">image/*</span>}
+          {e.kind === "html" && <span className="hidden rounded-full border border-line px-2.5 py-1 font-mono text-[10px] text-dim sm:block">text/html</span>}
           <ChevronIcon className={`shrink-0 text-dim transition-transform duration-300 ${isOpen ? "rotate-180 text-ember" : ""}`} />
         </button>
       </h3>
@@ -256,6 +259,19 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
                     <img src={res.img} alt={`Hasil ${e.title}`} className="max-h-[360px] max-w-full rounded-lg border border-line bg-[repeating-conic-gradient(#1a1714_0%_25%,#141210_0%_50%)] [background-size:16px_16px]" />
                     <p className="mt-3 font-mono text-[11px] text-dim">
                       {res.type} · {((res.size ?? 0) / 1024).toFixed(1)} KB
+                    </p>
+                  </div>
+                ) : res.frame ? (
+                  <div className="response-in">
+                    <iframe
+                      src={res.frame}
+                      title={`Hasil ${e.title}`}
+                      allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                      allowFullScreen
+                      className="aspect-video w-full rounded-lg border border-line bg-black"
+                    />
+                    <p className="mt-3 font-mono text-[11px] text-dim">
+                      {res.type} · pratinjau langsung di dalam &lt;iframe&gt;
                     </p>
                   </div>
                 ) : (

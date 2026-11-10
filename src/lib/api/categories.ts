@@ -58,6 +58,20 @@ export const categories: Category[] = [
     description: "Cuaca, gempa BMKG, kurs, harga kripto, Wikipedia, GitHub, NPM, hari libur, lirik, dan kamus.",
     seoTitle: "REST API Info: Cuaca, Gempa BMKG, Kurs, Kripto, Wikipedia",
   },
+  {
+    id: "komik",
+    name: "Komik",
+    tagline: "Scraper Komiku",
+    description: "Scraper komiku.org: komik terbaru & populer, pencarian, metadata lengkap, daftar chapter, dan gambar tiap halaman chapter.",
+    seoTitle: "REST API Komik: Scraper Komiku Manga, Manhwa, Manhua",
+  },
+  {
+    id: "anime",
+    name: "Anime",
+    tagline: "Scraper Animekuindo",
+    description: "Scraper anime-kuindo.com: episode terbaru, pencarian, metadata anime, daftar episode, dan link player video siap pasang di iframe.",
+    seoTitle: "REST API Anime: Scraper Animekuindo, Link Player & Embed",
+  },
 ];
 
 export const categoryById = Object.fromEntries(categories.map((c) => [c.id, c])) as Record<CategoryId, Category>;
