@@ -19,14 +19,27 @@ export const islamiEndpoints: Endpoint[] = [
       if (Number.isNaN(n)) throw new HttpError(400, "Parameter 'number' wajib diisi (1–114).");
       const d = await fetchJson<{ data: SurahEdition[] }>(`https://api.alquran.cloud/v1/surah/${n}/editions/quran-uthmani,id.indonesian`);
       const [ar, id] = d.data;
-      let ayahs = ar.ayahs.map((a, i) => ({ number: a.numberInSurah, arabic: a.text, translation: id.ayahs[i].text, juz: a.juz }));
+      // Sumber menempelkan basmalah di depan ayat 1 (kecuali Al-Fatihah & At-Taubah),
+      // sehingga teks Arab tidak cocok dengan terjemahannya. Pisahkan ke field sendiri.
+      let bismillah: string | null = null;
+      let ayahs = ar.ayahs.map((a, i) => {
+        let arabic = a.text;
+        if (n !== 1 && n !== 9 && a.numberInSurah === 1) {
+          const words = arabic.split(" ");
+          if (words.length > 4 && words[0].replace(/\p{M}/gu, "") === "\u0628\u0633\u0645") {
+            bismillah = words.slice(0, 4).join(" ");
+            arabic = words.slice(4).join(" ");
+          }
+        }
+        return { number: a.numberInSurah, arabic, translation: id.ayahs[i].text, juz: a.juz };
+      });
       const only = sp.get("ayah");
       if (only) {
         const a = ayahs.find((x) => x.number === Number(only));
         if (!a) throw new HttpError(404, "Ayat tidak ditemukan.");
         ayahs = [a];
       }
-      return { number: ar.number, name: ar.name, latin: ar.englishName, meaning: ar.englishNameTranslation, revelation: ar.revelationType, totalAyahs: ar.numberOfAyahs, ayahs };
+      return { number: ar.number, name: ar.name, latin: ar.englishName, meaning: ar.englishNameTranslation, revelation: ar.revelationType, totalAyahs: ar.numberOfAyahs, bismillah, ayahs };
     },
   },
   {
