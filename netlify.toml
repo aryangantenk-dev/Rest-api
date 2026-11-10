@@ -1,0 +1,4 @@
+# Netlify mendeteksi Next.js dan memasang adapter-nya secara otomatis.
+[build]
+  command = "npm run build"
+  publish = ".next"
