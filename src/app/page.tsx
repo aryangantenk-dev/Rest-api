@@ -77,7 +77,7 @@ export default function Home() {
           <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-bg to-transparent" />
         </div>
 
-        <div className="mx-auto grid max-w-7xl items-center gap-16 px-5 sm:px-8 lg:grid-cols-[1.05fr_1fr]">
+        <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-12 px-5 sm:px-8 lg:grid-cols-[1.05fr_1fr] lg:gap-16">
           <div>
             <div className="fade-up inline-flex items-center gap-2.5 rounded-full border border-linestrong bg-white/[0.03] py-1.5 pl-3 pr-4 text-xs text-muted backdrop-blur">
               <span className="live-dot" />
@@ -99,7 +99,7 @@ export default function Home() {
               ))}
             </h1>
 
-            <p className="fade-up mt-7 max-w-xl text-lg leading-relaxed text-muted" style={{ "--d": "700ms" } as React.CSSProperties}>
+            <p className="fade-up mt-6 max-w-xl text-base leading-relaxed text-muted sm:mt-7 sm:text-lg" style={{ "--d": "700ms" } as React.CSSProperties}>
               Yanxz API menyatukan puluhan fitur dalam satu base URL: AI, QR Code, cuaca, gempa BMKG, Al-Qur&apos;an, kurs, dan banyak lagi. Tanpa
               API key, tanpa daftar, tinggal panggil.
             </p>
@@ -109,11 +109,11 @@ export default function Home() {
             </div>
 
             <div className="fade-up mt-8 flex flex-wrap items-center gap-3" style={{ "--d": "1000ms" } as React.CSSProperties}>
-              <Link href="/docs" className="btn-primary group inline-flex items-center gap-2 rounded-full px-7 py-3.5 text-sm font-semibold">
+              <Link href="/docs" className="btn-primary group inline-flex w-full items-center justify-center gap-2 rounded-full px-7 py-3.5 text-sm font-semibold sm:w-auto">
                 Jelajahi dokumentasi
                 <ArrowIcon className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
               </Link>
-              <Link href="#mulai" className="btn-ghost rounded-full px-7 py-3.5 text-sm font-medium text-fg">
+              <Link href="#mulai" className="btn-ghost w-full rounded-full px-7 py-3.5 text-center text-sm font-medium text-fg sm:w-auto">
                 Lihat cara pakai
               </Link>
             </div>
@@ -127,7 +127,7 @@ export default function Home() {
         </div>
 
         {/* statistik */}
-        <div className="mx-auto mt-24 max-w-7xl px-5 sm:px-8">
+        <div className="mx-auto mt-16 max-w-7xl px-5 sm:mt-24 sm:px-8">
           <dl className="grid grid-cols-2 border-y border-line lg:grid-cols-4">
             {[
               { k: "Endpoint aktif", v: <CountUp to={meta.length} /> },
@@ -159,7 +159,7 @@ export default function Home() {
       </section>
 
       {/* ───────── KATEGORI ───────── */}
-      <section id="kategori" className="mx-auto mt-36 max-w-7xl px-5 sm:px-8">
+      <section id="kategori" className="mx-auto mt-20 max-w-7xl px-5 sm:mt-28 sm:px-8 lg:mt-36">
         <Reveal>
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-ember">01 — Kategori</p>
           <h2 className="mt-4 max-w-3xl font-display text-4xl font-semibold leading-[1.05] tracking-[-0.03em] sm:text-5xl">
@@ -167,7 +167,7 @@ export default function Home() {
           </h2>
         </Reveal>
 
-        <div className="mt-14 grid gap-4 lg:grid-cols-12">
+        <div className="mt-14 grid grid-cols-1 gap-4 lg:grid-cols-12">
           {categories.map((c, i) => {
             const items = meta.filter((e) => e.category === c.id);
             const spans = ["lg:col-span-7", "lg:col-span-5", "lg:col-span-4", "lg:col-span-4", "lg:col-span-4", "lg:col-span-5", "lg:col-span-7"];
@@ -206,8 +206,8 @@ export default function Home() {
       </section>
 
       {/* ───────── CARA PAKAI ───────── */}
-      <section id="mulai" className="mx-auto mt-40 max-w-7xl px-5 sm:px-8">
-        <div className="grid gap-16 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+      <section id="mulai" className="mx-auto mt-24 max-w-7xl px-5 sm:mt-32 sm:px-8 lg:mt-40">
+        <div className="grid grid-cols-1 gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-start lg:gap-16">
           <Reveal>
             <p className="font-mono text-xs uppercase tracking-[0.18em] text-ember">02 — Cara pakai</p>
             <h2 className="mt-4 font-display text-4xl font-semibold leading-[1.05] tracking-[-0.03em] sm:text-5xl">
@@ -255,14 +255,14 @@ export default function Home() {
       </section>
 
       {/* ───────── KEUNGGULAN ───────── */}
-      <section className="mx-auto mt-40 max-w-7xl px-5 sm:px-8">
+      <section className="mx-auto mt-24 max-w-7xl px-5 sm:mt-32 sm:px-8 lg:mt-40">
         <Reveal>
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-ember">03 — Keunggulan</p>
           <h2 className="mt-4 max-w-3xl font-display text-4xl font-semibold leading-[1.05] tracking-[-0.03em] sm:text-5xl">
             Dirancang supaya kamu fokus membangun, <span className="font-serif font-normal italic text-muted">bukan mengurus akses.</span>
           </h2>
         </Reveal>
-        <div className="mt-14 grid border-t border-line sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-14 grid grid-cols-1 border-t border-line sm:grid-cols-2 lg:grid-cols-3">
           {features.map((f, i) => (
             <Reveal key={f.t} delay={(i % 3) * 80} className="group border-b border-line p-7 transition-colors hover:bg-white/[0.02] sm:p-9 lg:[&:not(:nth-child(3n+1))]:border-l">
               <span className="font-mono text-xs text-dim">0{i + 1}</span>
@@ -274,7 +274,7 @@ export default function Home() {
       </section>
 
       {/* ───────── FAQ ───────── */}
-      <section id="faq" className="mx-auto mt-40 max-w-4xl px-5 sm:px-8">
+      <section id="faq" className="mx-auto mt-24 max-w-4xl px-5 sm:mt-32 sm:px-8 lg:mt-40">
         <Reveal>
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-ember">04 — FAQ</p>
           <h2 className="mt-4 font-display text-4xl font-semibold leading-[1.05] tracking-[-0.03em] sm:text-5xl">Pertanyaan yang sering muncul</h2>
@@ -295,9 +295,9 @@ export default function Home() {
       </section>
 
       {/* ───────── CTA ───────── */}
-      <section className="mx-auto mt-40 max-w-7xl px-5 sm:px-8">
+      <section className="mx-auto mt-24 max-w-7xl px-5 sm:mt-32 sm:px-8 lg:mt-40">
         <Reveal>
-          <div className="grain relative isolate overflow-hidden rounded-[2rem] border border-linestrong bg-surface px-7 py-20 text-center sm:px-16">
+          <div className="grain relative isolate overflow-hidden rounded-[2rem] border border-linestrong bg-surface px-6 py-14 text-center sm:px-16 sm:py-20">
             <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
               <div className="aurora aurora-1 left-[-10%] top-[-60%] h-[420px] w-[420px]" />
               <div className="aurora aurora-2 bottom-[-70%] right-[-5%] h-[420px] w-[420px]" />
@@ -308,11 +308,11 @@ export default function Home() {
             </h2>
             <p className="mx-auto mt-6 max-w-lg text-muted">Buka dokumentasi, pilih endpoint, tekan tombol kirim. Hasilnya langsung muncul di layar.</p>
             <div className="mt-10 flex flex-wrap justify-center gap-3">
-              <Link href="/docs" className="btn-primary group inline-flex items-center gap-2 rounded-full px-8 py-4 text-sm font-semibold">
+              <Link href="/docs" className="btn-primary group inline-flex w-full items-center justify-center gap-2 rounded-full px-8 py-4 text-sm font-semibold sm:w-auto">
                 Buka dokumentasi
                 <ArrowIcon className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
               </Link>
-              <a href="/api" className="btn-ghost rounded-full px-8 py-4 text-sm font-medium">
+              <a href="/api" className="btn-ghost w-full rounded-full px-8 py-4 text-sm font-medium sm:w-auto">
                 Lihat indeks JSON
               </a>
             </div>

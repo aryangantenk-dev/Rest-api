@@ -4,8 +4,8 @@ import { LogoMark } from "./icons";
 
 export function SiteFooter({ total }: { total: number }) {
   return (
-    <footer className="relative mt-32 border-t border-line">
-      <div className="mx-auto grid max-w-7xl gap-12 px-5 py-16 sm:px-8 md:grid-cols-[1.4fr_1fr_1fr]">
+    <footer className="relative mt-20 border-t border-line sm:mt-32">
+      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-10 px-5 py-12 sm:gap-12 sm:px-8 sm:py-16 md:grid-cols-[1.4fr_1fr_1fr]">
         <div>
           <Link href="/" className="inline-flex items-center gap-2.5" aria-label="Yanxz API">
             <LogoMark className="h-8 w-8" />

@@ -7,6 +7,13 @@ import { BaseUrlBox } from "./client-utils";
 import { DocsExplorer } from "./docs-explorer";
 import { CategoryIcon } from "./icons";
 
+const facts = [
+  ["Metode", "GET"],
+  ["Autentikasi", "Tidak ada"],
+  ["Format", "JSON / PNG"],
+  ["Batas", "120 / menit"],
+] as const;
+
 export function DocsShell({ active }: { active?: CategoryId }) {
   const all = allMeta();
   const list = active ? all.filter((e) => e.category === active) : all;
@@ -14,13 +21,13 @@ export function DocsShell({ active }: { active?: CategoryId }) {
   const current = active ? categoryById[active] : null;
 
   return (
-    <div className="mx-auto max-w-7xl px-5 pb-10 pt-28 sm:px-8 sm:pt-36">
-      <div className="grid gap-10 lg:grid-cols-[250px_minmax(0,1fr)] lg:gap-14">
+    <div className="mx-auto max-w-7xl px-5 pb-10 pt-24 sm:px-8 sm:pt-32 lg:pt-36">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[250px_minmax(0,1fr)] lg:gap-14">
         {/* sidebar */}
-        <aside className="lg:sticky lg:top-24 lg:self-start">
+        <aside className="min-w-0 lg:sticky lg:top-24 lg:self-start">
           <nav aria-label="Kategori dokumentasi">
             <p className="mb-4 hidden font-mono text-[11px] uppercase tracking-[0.16em] text-dim lg:block">Kategori</p>
-            <ul className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-2 lg:mx-0 lg:flex-col lg:gap-1 lg:overflow-visible lg:px-0 lg:pb-0">
+            <ul className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5 pb-2 sm:-mx-8 sm:px-8 lg:mx-0 lg:flex-col lg:gap-1 lg:overflow-visible lg:px-0 lg:pb-0">
               <li className="shrink-0">
                 <Link
                   href="/docs"
@@ -53,12 +60,7 @@ export function DocsShell({ active }: { active?: CategoryId }) {
           </nav>
 
           <dl className="mt-8 hidden space-y-3 rounded-2xl border border-line p-5 text-sm lg:block">
-            {[
-              ["Metode", "GET"],
-              ["Autentikasi", "Tidak ada"],
-              ["Format", "JSON / PNG"],
-              ["Batas", "120 / menit"],
-            ].map(([k, v]) => (
+            {facts.map(([k, v]) => (
               <div key={k} className="flex justify-between">
                 <dt className="text-dim">{k}</dt>
                 <dd className="font-mono text-xs text-fg">{v}</dd>
@@ -81,7 +83,7 @@ export function DocsShell({ active }: { active?: CategoryId }) {
                 </>
               )}
             </nav>
-            <h1 className="font-display text-4xl font-semibold leading-[1.05] tracking-[-0.03em] sm:text-5xl">
+            <h1 className="font-display text-[2.1rem] font-semibold leading-[1.05] tracking-[-0.03em] min-[400px]:text-4xl sm:text-5xl">
               {current ? (
                 <>
                   API <span className="font-serif font-normal italic text-ember-gradient">{current.name}</span>
@@ -100,6 +102,15 @@ export function DocsShell({ active }: { active?: CategoryId }) {
             <div className="mt-7">
               <BaseUrlBox fallback={SITE_URL} />
             </div>
+            {/* ringkasan cepat untuk HP & tablet (di desktop tampil di sidebar) */}
+            <dl className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line sm:grid-cols-4 lg:hidden">
+              {facts.map(([k, v]) => (
+                <div key={k} className="bg-bg px-4 py-3">
+                  <dt className="text-xs text-dim">{k}</dt>
+                  <dd className="mt-1 font-mono text-xs text-fg">{v}</dd>
+                </div>
+              ))}
+            </dl>
           </header>
 
           <div className="mt-10">

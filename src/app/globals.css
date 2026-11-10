@@ -230,6 +230,13 @@ body {
 }
 
 /* ---------- Misc ---------- */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 .caret::after {
   content: "";
   display: inline-block;
@@ -257,17 +264,21 @@ body {
   animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
-.collapse {
+/* Catatan: jangan dinamai `.collapse` — bentrok dengan utility Tailwind (visibility: collapse)
+   yang membuat isi panel tidak terlihat. */
+.accordion-panel {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: 0fr;
   transition: grid-template-rows 0.45s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
-.collapse.open {
+.accordion-panel.open {
   grid-template-rows: 1fr;
 }
-.collapse > div {
+.accordion-panel > div {
   overflow: hidden;
   min-height: 0;
+  min-width: 0;
 }
 
 .json-key { color: #ffb454; }

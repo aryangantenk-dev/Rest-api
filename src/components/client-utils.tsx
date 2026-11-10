@@ -47,7 +47,7 @@ export function BaseUrlBox({ fallback }: { fallback: string }) {
   return (
     <div className="group flex w-full max-w-xl items-center gap-3 rounded-2xl border border-linestrong bg-surface/80 py-2 pl-4 pr-2 backdrop-blur transition-colors hover:border-ember/40">
       <span className="hidden font-mono text-[11px] uppercase tracking-[0.14em] text-dim sm:block">Base URL</span>
-      <span className="h-4 w-px bg-line sm:block" />
+      <span className="hidden h-4 w-px bg-line sm:block" />
       <code className="min-w-0 flex-1 truncate font-mono text-sm text-fg">{url}</code>
       <CopyButton text={url} />
     </div>

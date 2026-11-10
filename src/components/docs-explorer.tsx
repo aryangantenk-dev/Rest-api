@@ -99,7 +99,7 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
   const snippets = buildSnippets(fullUrl);
 
   return (
-    <article ref={ref} id={id} className={`overflow-hidden rounded-2xl border bg-surface transition-colors duration-300 ${isOpen ? "border-linestrong" : "border-line hover:border-linestrong"}`}>
+    <article ref={ref} id={id} className={`scroll-mt-36 overflow-hidden rounded-2xl border bg-surface transition-colors duration-300 ${isOpen ? "border-linestrong" : "border-line hover:border-linestrong"}`}>
       <h3 className="m-0">
         <button
           type="button"
@@ -109,26 +109,26 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
             setOpen(!isOpen);
             if (!isOpen) history.replaceState(null, "", `#${id}`);
           }}
-          className="flex w-full items-center gap-4 p-4 text-left sm:p-5"
+          className="flex w-full items-center gap-3 p-4 text-left sm:gap-4 sm:p-5"
         >
-          <span className="rounded-md bg-mint/15 px-2 py-1 font-mono text-[10px] font-semibold tracking-wider text-mint">GET</span>
+          <span className="shrink-0 rounded-md bg-mint/15 px-2 py-1 font-mono text-[10px] font-semibold tracking-wider text-mint">GET</span>
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <span className="font-display text-base font-semibold tracking-tight sm:text-lg">{e.title}</span>
               <code className="truncate font-mono text-xs text-muted">{e.path}</code>
             </span>
-            <span className="mt-1 line-clamp-1 block text-[13px] text-muted">{e.description}</span>
+            <span className="mt-1 line-clamp-2 text-[13px] leading-snug text-muted sm:line-clamp-1">{e.description}</span>
           </span>
           {e.kind === "image" && <span className="hidden rounded-full border border-line px-2.5 py-1 font-mono text-[10px] text-dim sm:block">image/png</span>}
           <ChevronIcon className={`shrink-0 text-dim transition-transform duration-300 ${isOpen ? "rotate-180 text-ember" : ""}`} />
         </button>
       </h3>
 
-      <div id={`${id}-panel`} className={`collapse ${isOpen ? "open" : ""}`} aria-hidden={!isOpen} inert={!isOpen}>
+      <div id={`${id}-panel`} className={`accordion-panel ${isOpen ? "open" : ""}`} aria-hidden={!isOpen} inert={!isOpen}>
         <div>
-          <div className="grid gap-px border-t border-line bg-line lg:grid-cols-[1fr_1fr]">
+          <div className="grid grid-cols-1 gap-px border-t border-line bg-line lg:grid-cols-2">
             {/* kiri: parameter */}
-            <div className="space-y-5 bg-surface p-5 sm:p-6">
+            <div className="min-w-0 space-y-5 bg-surface p-4 sm:p-6">
               <p className="text-sm leading-relaxed text-muted">{e.description}</p>
 
               {e.params.length ? (
@@ -154,7 +154,7 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
                           spellCheck={false}
                           autoComplete="off"
                           placeholder={p.example || p.name}
-                          className="mt-2 w-full rounded-xl border border-line bg-bg px-3.5 py-2.5 font-mono text-[13px] text-fg outline-none transition-colors placeholder:text-dim focus:border-ember/60"
+                          className="mt-2 w-full rounded-xl border border-line bg-bg px-3.5 py-2.5 font-mono text-base text-fg outline-none transition-colors placeholder:text-dim focus:border-ember/60 sm:text-[13px]"
                         />
                       </div>
                     ))}
@@ -187,7 +187,7 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
             </div>
 
             {/* kanan: respons / kode */}
-            <div className="flex min-h-[320px] flex-col bg-[#0d0b0a]">
+            <div className="flex min-h-[240px] min-w-0 flex-col bg-[#0d0b0a] lg:min-h-[320px]">
               <div className="flex items-center justify-between border-b border-line px-4">
                 <div role="tablist" className="flex">
                   {(["respons", "kode"] as const).map((t) => (
@@ -240,7 +240,7 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
                     ))}
                   </div>
                 ) : !res ? (
-                  <div className="grid h-full min-h-[220px] place-items-center text-center">
+                  <div className="grid h-full min-h-[160px] place-items-center text-center lg:min-h-[220px]">
                     <div>
                       <div className="mx-auto grid h-11 w-11 place-items-center rounded-full border border-line text-dim">
                         <PlayIcon />
@@ -302,7 +302,7 @@ export function DocsExplorer({ endpoints, categories, fallback, showGroupHeading
 
   return (
     <div>
-      <div className="sticky top-16 z-30 -mx-1 bg-bg/80 px-1 py-3 backdrop-blur-xl">
+      <div className="sticky top-14 z-30 -mx-1 bg-bg/80 px-1 py-3 backdrop-blur-xl">
         <div className="group relative">
           <SearchIcon className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-dim transition-colors group-focus-within:text-ember" />
           <input
@@ -310,9 +310,9 @@ export function DocsExplorer({ endpoints, categories, fallback, showGroupHeading
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Cari endpoint, mis. cuaca, qrcode, translate…"
+            placeholder="Cari endpoint, mis. cuaca"
             aria-label="Cari endpoint"
-            className="w-full rounded-2xl border border-line bg-surface py-3.5 pl-12 pr-16 text-sm text-fg outline-none transition-colors placeholder:text-dim focus:border-ember/60"
+            className="w-full rounded-2xl border border-line bg-surface py-3.5 pl-12 pr-4 text-base text-fg outline-none transition-colors placeholder:text-dim focus:border-ember/60 sm:pr-16 sm:text-sm"
           />
           <kbd className="pointer-events-none absolute right-4 top-1/2 hidden -translate-y-1/2 rounded-md border border-line px-2 py-0.5 font-mono text-[11px] text-dim sm:block">/</kbd>
         </div>
@@ -328,12 +328,12 @@ export function DocsExplorer({ endpoints, categories, fallback, showGroupHeading
           {groups.map(({ c, items }) => (
             <section key={c.id} aria-labelledby={`grp-${c.id}`}>
               {showGroupHeadings && (
-                <div className="mb-5 flex items-center gap-4">
-                  <span className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-surface text-ember">
+                <div className="mb-5 flex items-center gap-3 sm:gap-4">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-line bg-surface text-ember">
                     <CategoryIcon id={c.id} className="h-5 w-5" />
                   </span>
-                  <div>
-                    <h2 id={`grp-${c.id}`} className="font-display text-2xl font-semibold tracking-tight">
+                  <div className="min-w-0">
+                    <h2 id={`grp-${c.id}`} className="font-display text-xl font-semibold tracking-tight sm:text-2xl">
                       {c.name}
                     </h2>
                     <p className="text-sm text-muted">{c.tagline}</p>
