@@ -1,16 +1,15 @@
-import { sql } from "drizzle-orm";
-import { getDb } from "@/db";
+import { getStore } from "@/db/store";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const store = getStore();
+  // Penyimpanan opsional: tanpa konfigurasi database aplikasi tetap sehat.
+  if (!store) return Response.json({ ok: true, database: "not_configured" });
   try {
-    const db = await getDb();
-    // Database opsional: tanpa DATABASE_URL aplikasi tetap sehat.
-    if (!db) return Response.json({ ok: true, database: "not_configured" });
-    await db.execute(sql`select 1`);
-    return Response.json({ ok: true, database: "connected" });
+    await store.ping();
+    return Response.json({ ok: true, database: "connected", backend: store.kind });
   } catch {
-    return Response.json({ ok: false, database: "error" }, { status: 500 });
+    return Response.json({ ok: false, database: "error", backend: store.kind }, { status: 500 });
   }
 }

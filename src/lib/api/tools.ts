@@ -1,8 +1,6 @@
 import crypto from "node:crypto";
 import QRCode from "qrcode";
-import { eq } from "drizzle-orm";
-import { getDb } from "@/db";
-import { shortLinks } from "@/db/schema";
+import { getStore } from "@/db/store";
 import type { Endpoint } from "./types";
 import { HttpError } from "./types";
 import { binaryResponse, fetchJson, fetchRaw, need, normalizeHex, num, opt, parseHttpUrl } from "./helpers";
@@ -182,30 +180,47 @@ export const toolsEndpoints: Endpoint[] = [
   },
   {
     category: "tools", slug: "shorturl", kind: "json",
-    title: "Pemendek URL",
-    description: "Buat tautan pendek yang langsung bisa dipakai. Tautan yang sama selalu menghasilkan kode yang sama.",
+    title: "Pemendek URL (Yanxz)",
+    description: "Pemendek URL bawaan Yanxz API. Hasilnya tautan pendek di domain ini yang langsung bisa dipakai dan dihitung kliknya. URL yang sama selalu mendapat kode yang sama.",
     params: [{ name: "url", required: true, description: "URL panjang yang akan dipendekkan.", example: "https://nextjs.org/docs/app/getting-started" }],
     handler: async ({ sp, origin }) => {
       const u = parseHttpUrl(need(sp, "url", 2000)).toString();
-      const db = await getDb().catch(() => {
+      const store = getStore();
+      if (!store) throw new HttpError(503, "Pemendek URL belum aktif: database belum dikonfigurasi di server ini. Gunakan /api/tools/tinyurl sebagai alternatif.");
+      let link: { code: string; hits: number } | null = null;
+      try {
+        // Kode acak bisa bertabrakan dengan milik URL lain; coba beberapa kali.
+        for (let n = 0; n < 5 && !link; n++) link = await store.shorten(u, shortCode());
+      } catch {
         throw new HttpError(503, "Database pemendek URL sedang tidak dapat dihubungi. Coba lagi nanti.");
-      });
-      if (!db) throw new HttpError(503, "Pemendek URL belum aktif: database belum dikonfigurasi di server ini.");
-      const existing = await db.select().from(shortLinks).where(eq(shortLinks.url, u)).limit(1);
-      let code = existing[0]?.code;
-      if (!code) {
-        for (let n = 0; n < 5 && !code; n++) {
-          const c = shortCode();
-          try {
-            await db.insert(shortLinks).values({ code: c, url: u });
-            code = c;
-          } catch {
-            /* tabrakan kode, coba lagi */
-          }
-        }
       }
-      if (!code) throw new HttpError(500, "Gagal membuat tautan pendek.");
-      return { original: u, short: `${origin}/s/${code}`, code, hits: existing[0]?.hits ?? 0 };
+      if (!link) throw new HttpError(500, "Gagal membuat tautan pendek.");
+      return { original: u, short: `${origin}/s/${link.code}`, code: link.code, hits: link.hits, provider: "yanxz" };
+    },
+  },
+  {
+    category: "tools", slug: "tinyurl", kind: "json",
+    title: "Pemendek URL (TinyURL)",
+    description: "Pendekkan URL lewat layanan TinyURL (tinyurl.com). Bisa memakai alias kustom agar tautannya mudah diingat.",
+    params: [
+      { name: "url", required: true, description: "URL panjang yang akan dipendekkan.", example: "https://nextjs.org/docs/app/getting-started" },
+      { name: "alias", description: "Alias kustom (5–30 karakter: huruf, angka, - atau _). Kosongkan untuk kode acak." },
+    ],
+    handler: async ({ sp }) => {
+      const u = parseHttpUrl(need(sp, "url", 2000)).toString();
+      const alias = opt(sp, "alias");
+      if (alias && !/^[A-Za-z0-9_-]{5,30}$/.test(alias)) throw new HttpError(400, "Parameter 'alias' harus 5–30 karakter dan hanya berisi huruf, angka, '-' atau '_'.");
+      let short: string;
+      try {
+        const res = await fetchRaw(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(u)}${alias ? `&alias=${encodeURIComponent(alias)}` : ""}`);
+        short = (await res.text()).trim();
+      } catch (e) {
+        // TinyURL membalas 4xx bila alias sudah dipakai.
+        if (alias && e instanceof HttpError && e.status === 502) throw new HttpError(409, `Alias '${alias}' ditolak TinyURL (kemungkinan sudah dipakai). Coba alias lain.`);
+        throw e;
+      }
+      if (!/^https?:\/\/tinyurl\.com\/\S+$/i.test(short)) throw new HttpError(502, "TinyURL mengirim respons yang tidak valid.");
+      return { original: u, short, code: short.split("/").pop(), provider: "tinyurl" };
     },
   },
   {

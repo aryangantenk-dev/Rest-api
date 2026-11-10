@@ -1,34 +1,30 @@
-import { desc, sql } from "drizzle-orm";
-import { getDb } from "@/db";
-import { apiStats } from "@/db/schema";
-
-type Stats = { totalRequests: number; top: { path: string; hits: number }[] };
+import { after } from "next/server";
+import { getStore, type Stats } from "@/db/store";
 
 const EMPTY: Stats = { totalRequests: 0, top: [] };
 
-/** Fire-and-forget: statistik tidak boleh mengganggu atau memperlambat respons API. */
+/**
+ * Statistik tidak boleh mengganggu atau memperlambat respons API, jadi dicatat
+ * setelah respons terkirim. `after` menjaga fungsi serverless tetap hidup sampai
+ * pencatatan selesai (tanpa itu permintaannya bisa terputus di Vercel).
+ */
 export function recordHit(path: string) {
-  void (async () => {
-    try {
-      const db = await getDb();
-      if (!db) return;
-      await db
-        .insert(apiStats)
-        .values({ path, hits: 1 })
-        .onConflictDoUpdate({ target: apiStats.path, set: { hits: sql`${apiStats.hits} + 1`, updatedAt: new Date() } });
-    } catch {
+  const store = getStore();
+  if (!store) return;
+  const task = () =>
+    store.recordHit(path).catch(() => {
       /* diabaikan */
-    }
-  })();
+    });
+  try {
+    after(task);
+  } catch {
+    void task();
+  }
 }
 
 export async function getStats(): Promise<Stats> {
   try {
-    const db = await getDb();
-    if (!db) return EMPTY;
-    const [total] = await db.select({ total: sql<number>`coalesce(sum(${apiStats.hits}), 0)::int` }).from(apiStats);
-    const top = await db.select({ path: apiStats.path, hits: apiStats.hits }).from(apiStats).orderBy(desc(apiStats.hits)).limit(5);
-    return { totalRequests: total?.total ?? 0, top };
+    return (await getStore()?.getStats()) ?? EMPTY;
   } catch {
     return EMPTY;
   }
