@@ -1,0 +1,32 @@
+import { NextResponse } from "next/server";
+import { allMeta } from "@/lib/api/registry";
+import { categories } from "@/lib/api/categories";
+import { getOrigin } from "@/lib/site";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(req: Request) {
+  const origin = getOrigin(req);
+  const list = allMeta();
+  return new NextResponse(
+    JSON.stringify(
+      {
+        status: true,
+        name: "Yanxz API",
+        creator: "Yanxz",
+        baseUrl: `${origin}/api`,
+        docs: `${origin}/docs`,
+        apiKey: "not required",
+        totalEndpoints: list.length,
+        categories: categories.map((c) => ({
+          id: c.id,
+          name: c.name,
+          endpoints: list.filter((e) => e.category === c.id).map((e) => ({ path: e.path, title: e.title, params: e.params.map((p) => p.name) })),
+        })),
+      },
+      null,
+      2,
+    ),
+    { headers: { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": "*" } },
+  );
+}
