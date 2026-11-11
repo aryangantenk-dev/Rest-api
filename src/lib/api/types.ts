@@ -5,7 +5,9 @@ export type CategoryId =
   | "image"
   | "random"
   | "islami"
-  | "info";
+  | "info"
+  | "komik"
+  | "anime";
 
 export type Param = {
   name: string;
@@ -26,7 +28,7 @@ export type Endpoint = {
   title: string;
   description: string;
   params: Param[];
-  kind: "json" | "image";
+  kind: "json" | "image" | "html";
   handler: (ctx: Ctx) => Promise<unknown>;
 };
 

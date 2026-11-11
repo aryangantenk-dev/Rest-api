@@ -6,6 +6,8 @@ import { imageEndpoints } from "./image";
 import { randomEndpoints } from "./random";
 import { islamiEndpoints } from "./islami";
 import { infoEndpoints } from "./info";
+import { komikEndpoints } from "./komik";
+import { animeEndpoints } from "./anime";
 import { categories } from "./categories";
 
 export const endpoints: Endpoint[] = [
@@ -16,6 +18,8 @@ export const endpoints: Endpoint[] = [
   ...randomEndpoints,
   ...islamiEndpoints,
   ...infoEndpoints,
+  ...komikEndpoints,
+  ...animeEndpoints,
 ];
 
 const index = new Map(endpoints.map((e) => [`${e.category}/${e.slug}`, e]));

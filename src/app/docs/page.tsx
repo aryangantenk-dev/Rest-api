@@ -6,7 +6,7 @@ import { SITE_NAME, SITE_URL } from "@/lib/site";
 export const metadata: Metadata = {
   title: "Dokumentasi REST API Lengkap dengan Playground",
   description:
-    "Dokumentasi seluruh endpoint Yanxz API: AI, tools, text, image, random, islami, dan informasi. Coba langsung di browser dan salin kode cURL, JavaScript, Python, PHP. Tanpa API key.",
+    "Dokumentasi seluruh endpoint Yanxz API: AI, tools, text, image, random, islami, informasi, komik, dan anime. Coba langsung di browser dan salin kode cURL, JavaScript, Python, PHP. Tanpa API key.",
   alternates: { canonical: "/docs" },
   openGraph: { url: "/docs", title: "Dokumentasi REST API Yanxz", description: "Semua endpoint, parameter, dan playground interaktif tanpa API key." },
 };

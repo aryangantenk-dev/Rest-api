@@ -66,6 +66,21 @@ export function CategoryIcon({ id, className }: { id: CategoryId } & P) {
           <path d="M3 12h18M12 3c2.6 2.6 3.9 5.6 3.9 9s-1.3 6.4-3.9 9c-2.6-2.6-3.9-5.6-3.9-9S9.4 5.6 12 3z" />
         </svg>
       );
+    case "komik":
+      return (
+        <svg {...base} className={className}>
+          <path d="M12 6.5C10.2 5.2 7.6 4.8 4 5v13c3.6-.2 6.2.2 8 1.5 1.8-1.3 4.4-1.7 8-1.5V5c-3.6-.2-6.2.2-8 1.5z" />
+          <path d="M12 6.5v13" />
+        </svg>
+      );
+    case "anime":
+      return (
+        <svg {...base} className={className}>
+          <rect x="3" y="5" width="18" height="13" rx="2.5" />
+          <path d="M10 9l5 2.5-5 2.5V9z" />
+          <path d="M8 21h8" />
+        </svg>
+      );
   }
 }
 
