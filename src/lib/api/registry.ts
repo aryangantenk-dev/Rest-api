@@ -8,6 +8,10 @@ import { islamiEndpoints } from "./islami";
 import { infoEndpoints } from "./info";
 import { komikEndpoints } from "./komik";
 import { animeEndpoints } from "./anime";
+import { canvasEndpoints } from "./canvas";
+import { searchEndpoints } from "./search";
+import { downloaderEndpoints } from "./downloader";
+import { gamesEndpoints } from "./games";
 import { categories } from "./categories";
 
 export const endpoints: Endpoint[] = [
@@ -15,7 +19,11 @@ export const endpoints: Endpoint[] = [
   ...toolsEndpoints,
   ...textEndpoints,
   ...imageEndpoints,
+  ...canvasEndpoints,
   ...randomEndpoints,
+  ...searchEndpoints,
+  ...downloaderEndpoints,
+  ...gamesEndpoints,
   ...islamiEndpoints,
   ...infoEndpoints,
   ...komikEndpoints,

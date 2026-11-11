@@ -7,7 +7,11 @@ export type CategoryId =
   | "islami"
   | "info"
   | "komik"
-  | "anime";
+  | "anime"
+  | "canvas"
+  | "search"
+  | "downloader"
+  | "games";
 
 export type Param = {
   name: string;

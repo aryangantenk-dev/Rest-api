@@ -280,6 +280,12 @@ body {
   min-height: 0;
   min-width: 0;
 }
+/* clip tidak membuat scroll container, sehingga scroll-margin kartu di dalamnya tetap dihormati. */
+@supports (overflow: clip) {
+  .accordion-panel > div {
+    overflow: clip;
+  }
+}
 
 .json-key { color: #ffb454; }
 .json-str { color: #8be3b5; }

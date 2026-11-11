@@ -1,6 +1,6 @@
 # Yanxz API
 
-REST API gratis tanpa API key (75 endpoint) beserta dokumentasi dan playground interaktif. Dibangun dengan Next.js 16 (App Router).
+REST API gratis tanpa API key (130+ endpoint) beserta dokumentasi dan playground interaktif. Dibangun dengan Next.js 16 (App Router).
 
 ## Menjalankan lokal
 
@@ -21,7 +21,65 @@ Kode berada langsung di root repository, jadi Vercel maupun Netlify mendeteksiny
 | `DATABASE_URL` | Alternatif: connection string PostgreSQL biasa. Tabel dibuat otomatis. Dipakai bila variabel Supabase di atas kosong. |
 | `NEXT_PUBLIC_SITE_URL` | Domain produksi untuk canonical URL, sitemap, dan Open Graph. |
 
+| `ADMIN_KEY` | Kunci rahasia owner untuk endpoint admin (daftar blokir, buka blokir, blokir manual). Tanpa ini endpoint admin nonaktif. |
+| `RATE_LIMIT_PER_MIN` | Batas permintaan per menit untuk setiap IP. Default `45`. |
+| `BAN_AFTER_STRIKES` | Jumlah pelanggaran dalam 10 menit sebelum IP diblokir permanen. Default `3`. |
+| `OWNER_WHATSAPP` | Nomor WhatsApp owner untuk banding blokir. Default `62895403334081`. |
+
 Tanpa database, semua endpoint lain tetap berjalan normal. Lihat `.env.example`. Status database bisa dicek di `/api/health`.
+
+## Batas pemakaian dan blokir IP
+
+- Setiap IP boleh mengirim **45 permintaan per menit** ke `/api/*`. Sisa kuota ada di header `x-ratelimit-remaining`.
+- Melewati batas menghasilkan HTTP `429` dengan field `retry_after` dan dihitung sebagai satu pelanggaran.
+- Tiga pelanggaran dalam 10 menit, atau lebih dari 180 permintaan dalam satu menit, membuat IP **diblokir permanen**. Semua permintaan berikutnya dijawab HTTP `403` berisi `banned: true`, alasan, dan tautan banding ke WhatsApp owner.
+- Daftar blokir disimpan di tabel `banned_ips` (Supabase/Postgres) sehingga berlaku di semua instance. Hitungan permintaan disimpan di memori tiap instance serverless, jadi batasnya bersifat perkiraan saat lalu lintas tersebar ke banyak instance.
+
+Mengelola blokir (hanya owner, butuh `ADMIN_KEY`):
+
+| Endpoint | Keterangan |
+| --- | --- |
+| `/api/admin/bans?key=…` | Daftar IP yang diblokir beserta alasan dan waktunya. |
+| `/api/admin/unban?ip=1.2.3.4&key=…` | Buka blokir sebuah IP. |
+| `/api/admin/ban?ip=1.2.3.4&reason=…&key=…` | Blokir IP secara manual. |
+
+Kunci juga bisa dikirim lewat header `x-admin-key`. Cara lain: hapus baris IP tersebut dari tabel `banned_ips` di Supabase.
+
+## Game untuk bot WhatsApp (Baileys)
+
+Semua game di `/api/games/*` tidak memakai sesi di server. Soal sudah menyertakan `jawaban`, `waktu`, dan `hadiah`, sehingga bot cukup menyimpan jawaban per chat. Bila tidak ingin mencocokkan sendiri, kirim jawaban pemain ke `/api/games/jawab`.
+
+```js
+const API = "https://domain-kamu.vercel.app/api";
+const sesi = new Map(); // chatId -> soal
+
+sock.ev.on("messages.upsert", async ({ messages }) => {
+  const m = messages[0];
+  const chat = m.key.remoteJid;
+  const teks = (m.message?.conversation || m.message?.extendedTextMessage?.text || "").trim();
+
+  if (teks === ".tebakkata") {
+    const { result } = await (await fetch(`${API}/games/tebakkata`)).json();
+    sesi.set(chat, result);
+    setTimeout(() => sesi.delete(chat), result.waktu * 1000);
+    return sock.sendMessage(chat, { text: `${result.soal}\n\nPetunjuk: ${result.petunjuk}\nWaktu: ${result.waktu} detik` });
+  }
+
+  const soal = sesi.get(chat);
+  if (soal && teks) {
+    const { result } = await (await fetch(`${soal.cek}${encodeURIComponent(teks)}`)).json();
+    if (result.benar) {
+      sesi.delete(chat);
+      return sock.sendMessage(chat, { text: `Benar! Jawabannya ${result.jawaban}. +${soal.hadiah} XP` });
+    }
+    if (result.hampir) return sock.sendMessage(chat, { text: "Dikit lagi!" });
+  }
+});
+```
+
+Game bergambar (`tebakgambar`, `tebakbendera`) mengembalikan field `gambar` yang bisa langsung dikirim: `sock.sendMessage(chat, { image: { url: result.gambar }, caption: result.soal })`.
+
+Akinator dan Tic Tac Toe juga tanpa sesi: simpan nilai `session` (Akinator) atau `board` (Tic Tac Toe) dari respons terakhir, lalu kirim kembali pada permintaan berikutnya.
 
 ## Pemendek URL
 

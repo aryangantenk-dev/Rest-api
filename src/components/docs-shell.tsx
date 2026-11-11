@@ -3,6 +3,7 @@ import { categories, categoryById } from "@/lib/api/categories";
 import { allMeta } from "@/lib/api/registry";
 import type { CategoryId } from "@/lib/api/types";
 import { SITE_URL } from "@/lib/site";
+import { RATE_LIMIT } from "@/lib/limits";
 import { BaseUrlBox } from "./client-utils";
 import { DocsExplorer } from "./docs-explorer";
 import { CategoryIcon } from "./icons";
@@ -11,7 +12,7 @@ const facts = [
   ["Metode", "GET"],
   ["Autentikasi", "Tidak ada"],
   ["Format", "JSON / PNG"],
-  ["Batas", "120 / menit"],
+  ["Batas", `${RATE_LIMIT} / menit / IP`],
 ] as const;
 
 export function DocsShell({ active }: { active?: CategoryId }) {

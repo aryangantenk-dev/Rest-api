@@ -44,7 +44,7 @@ export function SiteFooter({ total }: { total: number }) {
       <div className="border-t border-line">
         <div className="mx-auto flex max-w-7xl flex-col gap-2 px-5 py-6 text-xs text-dim sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <p>© {new Date().getFullYear()} Yanxz API. Dibuat dengan teliti di Indonesia.</p>
-          <p className="font-mono">Batas wajar: 120 permintaan / menit / IP</p>
+          <p className="font-mono">Batas: 45 permintaan / menit / IP</p>
         </div>
       </div>
     </footer>

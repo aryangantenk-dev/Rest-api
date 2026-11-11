@@ -20,6 +20,13 @@ type Result = {
   error?: string;
 };
 
+/** Gulir ke elemen dengan jarak aman dari header dan kolom pencarian yang menempel di atas. */
+function scrollToEl(el: Element | null | undefined) {
+  if (!el) return;
+  const top = el.getBoundingClientRect().top + window.scrollY - 148;
+  window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+}
+
 function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: string; forceOpen: boolean }) {
   const id = `${e.category}-${e.slug}`;
   const origin = useOrigin(fallback);
@@ -38,7 +45,7 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
     const check = () => {
       if (window.location.hash === `#${id}`) {
         setOpen(true);
-        setTimeout(() => ref.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
+        setTimeout(() => scrollToEl(ref.current), 120);
       }
     };
     check();
@@ -316,6 +323,36 @@ export function DocsExplorer({ endpoints, categories, fallback, showGroupHeading
 
   const groups = categories.map((c) => ({ c, items: filtered.filter((e) => e.category === c.id) })).filter((g) => g.items.length);
 
+  // Kategori bisa dilipat seperti kartu endpoint. Awalnya hanya kategori pertama yang terbuka
+  // supaya halaman tetap ringkas; pencarian dan tautan #hash membuka kategori terkait otomatis.
+  const collapsible = showGroupHeadings && categories.length > 1;
+  const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set(categories[0] ? [categories[0].id] : []));
+  const allOpen = categories.every((c) => openGroups.has(c.id));
+  const toggleGroup = useCallback((id: string) => {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!collapsible) return;
+    const check = () => {
+      const hash = decodeURIComponent(window.location.hash.slice(1));
+      if (!hash) return;
+      const cat = categories.find((c) => hash === `grp-${c.id}` || hash.startsWith(`${c.id}-`));
+      if (!cat) return;
+      setOpenGroups((prev) => (prev.has(cat.id) ? prev : new Set(prev).add(cat.id)));
+      // Gulir ulang setelah animasi buka selesai agar posisi kartu tepat.
+      setTimeout(() => scrollToEl(document.getElementById(hash)), 520);
+    };
+    check();
+    window.addEventListener("hashchange", check);
+    return () => window.removeEventListener("hashchange", check);
+  }, [collapsible, categories]);
+
   return (
     <div>
       <div className="sticky top-14 z-30 -mx-1 bg-bg/80 px-1 py-3 backdrop-blur-xl">
@@ -334,36 +371,93 @@ export function DocsExplorer({ endpoints, categories, fallback, showGroupHeading
         </div>
       </div>
 
+      {collapsible && !term && (
+        <div className="mt-1 flex items-center justify-between gap-4 px-1">
+          <p className="text-xs text-dim">Ketuk nama kategori untuk membuka atau menutupnya.</p>
+          <button
+            type="button"
+            onClick={() => setOpenGroups(allOpen ? new Set() : new Set(categories.map((c) => c.id)))}
+            className="shrink-0 rounded-full border border-line px-3.5 py-1.5 text-xs text-muted transition-colors hover:border-linestrong hover:text-fg"
+          >
+            {allOpen ? "Tutup semua" : "Buka semua"}
+          </button>
+        </div>
+      )}
+
       {groups.length === 0 ? (
         <div className="mt-10 rounded-2xl border border-dashed border-line px-6 py-16 text-center">
           <p className="font-display text-xl">Tidak ada endpoint yang cocok</p>
           <p className="mt-2 text-sm text-muted">Coba kata kunci lain seperti &ldquo;gambar&rdquo;, &ldquo;teks&rdquo;, atau &ldquo;cuaca&rdquo;.</p>
         </div>
       ) : (
-        <div className="mt-6 space-y-14">
-          {groups.map(({ c, items }) => (
-            <section key={c.id} aria-labelledby={`grp-${c.id}`}>
-              {showGroupHeadings && (
-                <div className="mb-5 flex items-center gap-3 sm:gap-4">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-line bg-surface text-ember">
-                    <CategoryIcon id={c.id} className="h-5 w-5" />
-                  </span>
-                  <div className="min-w-0">
-                    <h2 id={`grp-${c.id}`} className="font-display text-xl font-semibold tracking-tight sm:text-2xl">
-                      {c.name}
-                    </h2>
-                    <p className="text-sm text-muted">{c.tagline}</p>
-                  </div>
-                  <span className="ml-auto font-mono text-xs text-dim">{items.length}</span>
-                </div>
-              )}
+        <div className={collapsible ? "mt-5 space-y-3 [overflow-anchor:none]" : "mt-6 space-y-14"}>
+          {groups.map(({ c, items }) => {
+            const isOpen = !collapsible || !!term || openGroups.has(c.id);
+            const cards = (
               <div className="space-y-3">
                 {items.map((e) => (
                   <EndpointCard key={e.path} e={e} fallback={fallback} forceOpen={!!term && filtered.length === 1} />
                 ))}
               </div>
-            </section>
-          ))}
+            );
+            if (!collapsible) {
+              return (
+                <section key={c.id} aria-labelledby={showGroupHeadings ? `grp-${c.id}` : undefined}>
+                  {showGroupHeadings && (
+                    <div className="mb-5 flex items-center gap-3 sm:gap-4">
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-line bg-surface text-ember">
+                        <CategoryIcon id={c.id} className="h-5 w-5" />
+                      </span>
+                      <div className="min-w-0">
+                        <h2 id={`grp-${c.id}`} className="font-display text-xl font-semibold tracking-tight sm:text-2xl">
+                          {c.name}
+                        </h2>
+                        <p className="text-sm text-muted">{c.tagline}</p>
+                      </div>
+                      <span className="ml-auto font-mono text-xs text-dim">{items.length}</span>
+                    </div>
+                  )}
+                  {cards}
+                </section>
+              );
+            }
+            return (
+              <section
+                key={c.id}
+                aria-labelledby={`grp-${c.id}`}
+                className={`scroll-mt-36 rounded-3xl border transition-colors duration-300 ${isOpen ? "border-line bg-white/[0.015]" : "border-line/70 hover:border-linestrong"}`}
+              >
+                <h2 id={`grp-${c.id}`} className="scroll-mt-36">
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(c.id)}
+                    aria-expanded={isOpen}
+                    aria-controls={`grp-panel-${c.id}`}
+                    disabled={!!term}
+                    className="flex w-full items-center gap-3 rounded-3xl px-4 py-4 text-left sm:gap-4 sm:px-5"
+                  >
+                    <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl border bg-surface transition-colors duration-300 ${isOpen ? "border-ember/40 text-ember" : "border-line text-dim"}`}>
+                      <CategoryIcon id={c.id} className="h-5 w-5" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-display text-lg font-semibold tracking-tight sm:text-xl">{c.name}</span>
+                      <span className="block truncate text-sm font-normal text-muted">{c.tagline}</span>
+                    </span>
+                    <span className="shrink-0 rounded-full border border-line px-2.5 py-1 font-mono text-[11px] font-normal text-dim">
+                      {items.length}
+                      <span className="hidden sm:inline"> endpoint</span>
+                    </span>
+                    {!term && <ChevronIcon className={`shrink-0 text-dim transition-transform duration-300 ${isOpen ? "rotate-180 text-ember" : ""}`} />}
+                  </button>
+                </h2>
+                <div id={`grp-panel-${c.id}`} className={`accordion-panel ${isOpen ? "open" : ""}`} inert={!isOpen}>
+                  <div>
+                    <div className="px-3 pb-4 sm:px-4">{cards}</div>
+                  </div>
+                </div>
+              </section>
+            );
+          })}
         </div>
       )}
     </div>

@@ -27,6 +27,11 @@ const SCHEMA_SQL = `
     hits integer not null default 0,
     created_at timestamp not null default now()
   );
+  create table if not exists banned_ips (
+    ip varchar(64) primary key,
+    reason text not null default '',
+    created_at timestamp not null default now()
+  );
 `;
 
 function poolConfig(raw: string): PoolConfig {

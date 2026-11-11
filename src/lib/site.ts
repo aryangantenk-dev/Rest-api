@@ -1,7 +1,7 @@
 export const SITE_NAME = "Yanxz API";
 export const SITE_TAGLINE = "REST API Gratis Tanpa API Key";
 export const SITE_DESCRIPTION =
-  "Yanxz API adalah REST API gratis tanpa API key dengan 70+ endpoint: AI chat, text to image, QR code, pemendek URL, cuaca, gempa BMKG, Al-Qur'an, jadwal sholat, kurs, scraper komik & anime, dan banyak lagi. Dokumentasi lengkap dengan playground interaktif.";
+  "Yanxz API adalah REST API gratis tanpa API key dengan 130+ endpoint: AI chat, text to image, canvas (brat, iqc), downloader TikTok/Instagram/Facebook, pencarian Pinterest, game untuk bot WhatsApp, cuaca, gempa BMKG, Al-Qur'an, jadwal sholat, scraper komik & anime, dan banyak lagi. Dokumentasi lengkap dengan playground interaktif.";
 
 const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "";
 

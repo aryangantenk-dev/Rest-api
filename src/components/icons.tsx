@@ -73,6 +73,36 @@ export function CategoryIcon({ id, className }: { id: CategoryId } & P) {
           <path d="M12 6.5v13" />
         </svg>
       );
+    case "canvas":
+      return (
+        <svg {...base} className={className}>
+          <path d="M4 20l1.2-4.2L16.5 4.500a2.100 2.100 0 0 1 3 3L8.200 18.800 4 20z" />
+          <path d="M14.500 6.500l3 3" />
+        </svg>
+      );
+    case "search":
+      return (
+        <svg {...base} className={className}>
+          <circle cx="11" cy="11" r="6.5" />
+          <path d="M20 20l-4.200-4.200" />
+        </svg>
+      );
+    case "downloader":
+      return (
+        <svg {...base} className={className}>
+          <path d="M12 4v11M7.500 10.500L12 15l4.500-4.500" />
+          <path d="M5 19h14" />
+        </svg>
+      );
+    case "games":
+      return (
+        <svg {...base} className={className}>
+          <rect x="2.500" y="7" width="19" height="11" rx="5.500" />
+          <path d="M7 12.500h4M9 10.500v4" />
+          <circle cx="15.500" cy="11.500" r="0.900" fill="currentColor" />
+          <circle cx="18" cy="13.500" r="0.900" fill="currentColor" />
+        </svg>
+      );
     case "anime":
       return (
         <svg {...base} className={className}>

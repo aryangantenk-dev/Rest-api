@@ -25,7 +25,7 @@ const features = [
 ];
 
 const faqs = [
-  { q: "Apakah Yanxz API benar-benar gratis dan tanpa API key?", a: "Ya. Semua endpoint bisa dipanggil langsung tanpa registrasi maupun API key. Untuk menjaga kualitas layanan, berlaku batas wajar 120 permintaan per menit untuk setiap alamat IP." },
+  { q: "Apakah Yanxz API benar-benar gratis dan tanpa API key?", a: "Ya. Semua endpoint bisa dipanggil langsung tanpa registrasi maupun API key. Untuk menjaga kualitas layanan, berlaku batas 45 permintaan per menit untuk setiap alamat IP. IP yang berulang kali melewati batas akan diblokir dan bisa mengajukan banding ke owner lewat WhatsApp." },
   { q: "Bagaimana format respons yang dikembalikan?", a: "Endpoint data mengembalikan JSON dengan pola { status, creator, result }. Bila terjadi kesalahan, kamu menerima { status: false, code, error } disertai kode HTTP yang sesuai. Endpoint kategori Image dan beberapa endpoint tools mengembalikan file gambar PNG secara langsung." },
   { q: "Bolehkah dipakai untuk bot WhatsApp, Telegram, atau Discord?", a: "Tentu. CORS terbuka dan responsnya ringan sehingga cocok dipakai pada bot, aplikasi web, dan proyek hobi. Mohon tidak menyalahgunakannya untuk spam atau aktivitas yang melanggar hukum." },
   { q: "Dari mana data cuaca, gempa, dan jadwal sholat berasal?", a: "Gempa diambil langsung dari BMKG, cuaca dari Open-Meteo, dan jadwal sholat serta Al-Qur'an dari layanan terbuka yang terpercaya. Yanxz API merapikan datanya agar konsisten dan mudah dipakai." },
