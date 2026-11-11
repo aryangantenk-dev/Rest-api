@@ -9,7 +9,14 @@
 #   sudo bash install.sh          tes situs dulu, pasang bila ada yang lolos
 #   TEST_ONLY=1 bash install.sh   hanya tes, tidak memasang apa pun
 #   sudo FORCE=1 bash install.sh  pasang walau semua tes gagal
+#   sudo TUNNEL=1 bash install.sh pasang + buka terowongan (untuk VPS/container NAT
+#                                 yang port-nya tidak bisa dijangkau dari luar)
+#   sudo bash install.sh url      tampilkan alamat terowongan yang sedang aktif
 #   sudo bash install.sh uninstall
+#
+# TUNNEL: auto (bawaan; terowongan dibuka bila IP publik bukan milik mesin ini),
+#         1 (selalu), 0 (jangan). Terowongan memakai cloudflared "quick tunnel":
+#         tanpa akun, tetapi alamatnya BERGANTI setiap layanan/VPS dinyalakan ulang.
 set -euo pipefail
 
 PORT="${PORT:-8787}"
@@ -17,15 +24,28 @@ ALLOW_HOSTS="${ALLOW_HOSTS:-lk21official.cc,nontondrama.vip,lk21.de,idlixku.com,
 APP_DIR=/opt/film-proxy
 ENV_FILE=/etc/film-proxy.env
 UNIT=/etc/systemd/system/film-proxy.service
+TUNNEL_UNIT=/etc/systemd/system/film-proxy-tunnel.service
+TUNNEL_LOG=/var/log/film-proxy-tunnel.log
+CF_BIN=/usr/local/bin/cloudflared
 UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
 has_systemd() { [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1; }
+tunnel_url() { # alamat terowongan terakhir yang tercatat di log
+  { grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' "$TUNNEL_LOG" 2>/dev/null || true; } | { grep -v '//api\.' || true; } | tail -n1
+}
+
+if [ "${1:-}" = "url" ]; then
+  U="$(tunnel_url)"
+  if [ -n "$U" ]; then echo "PROXY_URL=$U"; else echo "Terowongan belum aktif. Jalankan: TUNNEL=1 bash install.sh"; fi
+  exit 0
+fi
 
 if [ "${1:-}" = "uninstall" ]; then
   [ "$(id -u)" = 0 ] || { echo "Jalankan dengan sudo."; exit 1; }
-  if has_systemd; then systemctl disable --now film-proxy 2>/dev/null || true; fi
+  if has_systemd; then systemctl disable --now film-proxy film-proxy-tunnel 2>/dev/null || true; fi
   pkill -f "$APP_DIR/proxy.py" 2>/dev/null || true
-  rm -rf "$APP_DIR" "$ENV_FILE" "$UNIT"
+  pkill -f "$CF_BIN tunnel" 2>/dev/null || true
+  rm -rf "$APP_DIR" "$ENV_FILE" "$UNIT" "$TUNNEL_UNIT" "$TUNNEL_LOG" "$CF_BIN"
   if has_systemd; then systemctl daemon-reload || true; fi
   echo "film-proxy sudah dihapus."
   exit 0
@@ -224,7 +244,7 @@ EOF
   MODE="systemd (otomatis hidup lagi setelah reboot)"
 else
   pkill -f "$APP_DIR/proxy.py" 2>/dev/null || true
-  ( set -a; . "$ENV_FILE"; set +a; nohup python3 "$APP_DIR/proxy.py" >/var/log/film-proxy.log 2>&1 & )
+  ( set -a; . "$ENV_FILE"; set +a; nohup python3 "$APP_DIR/proxy.py" </dev/null >/var/log/film-proxy.log 2>&1 & )
   MODE="nohup (TIDAK otomatis hidup setelah reboot; jalankan ulang skrip ini)"
 fi
 
@@ -235,14 +255,143 @@ fi
 sleep 2
 LOCAL="$(curl -s --max-time 5 "http://127.0.0.1:$PORT/health" || true)"
 PUBLIC_IP="$(curl -4 -s --max-time 8 https://api.ipify.org || curl -4 -s --max-time 8 https://ifconfig.me || true)"
+INNER_IPS="$(hostname -I 2>/dev/null || true)"
 
 echo "== film-proxy terpasang =="
 echo "  Mode        : $MODE"
-echo "  Cek lokal   : ${LOCAL:-GAGAL (lihat: journalctl -u film-proxy -n 20)}"
-echo "  IP di dalam : $(hostname -I 2>/dev/null || true)"
+echo "  Cek lokal   : ${LOCAL:-GAGAL}"
+echo "  IP publik   : ${PUBLIC_IP:-tidak diketahui}"
+echo "  IP di dalam : $INNER_IPS"
+
+if [ "$LOCAL" != "ok" ]; then
+  echo
+  echo "======== KIRIM BAGIAN INI KE AGEN ========"
+  echo "HASIL TES:$RESULT"
+  echo "PROXY GAGAL JALAN. Log terakhir:"
+  if has_systemd; then journalctl -u film-proxy -n 15 --no-pager 2>/dev/null || true
+  else tail -n 15 /var/log/film-proxy.log 2>/dev/null || true; fi
+  echo "=========================================="
+  exit 1
+fi
+
+# ------------------------------------------------------------- 3. terowongan
+# Banyak container murah berada di balik NAT: IP publiknya milik mesin induk,
+# jadi port $PORT tidak bisa dijangkau dari luar. Terowongan keluar (cloudflared
+# quick tunnel) memberi alamat https publik tanpa perlu membuka port apa pun.
+TUNNEL="${TUNNEL:-auto}"
+if [ "$TUNNEL" = "auto" ]; then
+  TUNNEL=1
+  if [ -n "$PUBLIC_IP" ]; then
+    for ip in $INNER_IPS; do
+      if [ "$ip" = "$PUBLIC_IP" ]; then TUNNEL=0; fi
+    done
+  fi
+fi
+
+stop_tunnel() {
+  if has_systemd; then systemctl disable --now film-proxy-tunnel 2>/dev/null || true; fi
+  pkill -f "$CF_BIN tunnel" 2>/dev/null || true
+}
+
+start_tunnel() {
+  local arch
+  case "$(uname -m)" in
+    x86_64 | amd64) arch=amd64 ;;
+    aarch64 | arm64) arch=arm64 ;;
+    armv7l | armhf) arch=arm ;;
+    i386 | i686) arch=386 ;;
+    *) echo "  Arsitektur $(uname -m) tidak didukung cloudflared."; return 1 ;;
+  esac
+  if ! "$CF_BIN" --version >/dev/null 2>&1; then
+    echo "  Mengunduh cloudflared ($arch)..."
+    rm -f "$CF_BIN.tmp"
+    curl -fsSL --retry 2 --max-time 240 -o "$CF_BIN.tmp" \
+      "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$arch" \
+      || { echo "  Gagal mengunduh cloudflared."; rm -f "$CF_BIN.tmp"; return 1; }
+    chmod 755 "$CF_BIN.tmp" && mv -f "$CF_BIN.tmp" "$CF_BIN"
+    "$CF_BIN" --version >/dev/null 2>&1 || { echo "  cloudflared tidak bisa dijalankan di mesin ini."; return 1; }
+  fi
+
+  stop_tunnel
+  ( umask 022; : > "$TUNNEL_LOG" )
+  if has_systemd; then
+    cat > "$TUNNEL_UNIT" <<EOF
+[Unit]
+Description=film-proxy tunnel (cloudflared quick tunnel ke port $PORT)
+After=network-online.target film-proxy.service
+Wants=network-online.target
+
+[Service]
+ExecStart=$CF_BIN tunnel --no-autoupdate --protocol http2 --url http://127.0.0.1:$PORT
+User=nobody
+Group=nogroup
+NoNewPrivileges=true
+Restart=always
+RestartSec=5
+StandardOutput=append:$TUNNEL_LOG
+StandardError=append:$TUNNEL_LOG
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    chmod 644 "$TUNNEL_UNIT"
+    systemctl daemon-reload
+    systemctl enable film-proxy-tunnel >/dev/null 2>&1 || true
+    systemctl restart film-proxy-tunnel
+  else
+    ( nohup "$CF_BIN" tunnel --no-autoupdate --protocol http2 --url "http://127.0.0.1:$PORT" </dev/null >>"$TUNNEL_LOG" 2>&1 & )
+  fi
+
+  echo "  Menunggu alamat terowongan..."
+  TUNNEL_URL=""
+  for _ in $(seq 1 40); do
+    TUNNEL_URL="$(tunnel_url)"
+    if [ -n "$TUNNEL_URL" ]; then break; fi
+    sleep 1
+  done
+  if [ -z "$TUNNEL_URL" ]; then
+    echo "  Terowongan tidak memberi alamat. Log terakhir:"
+    tail -n 12 "$TUNNEL_LOG" 2>/dev/null || true
+    return 1
+  fi
+
+  # Alamat baru butuh beberapa detik sampai bisa dipakai.
+  TUNNEL_CHECK="belum terjawab (wajar bila baru dibuat; agen akan mengecek ulang)"
+  for _ in $(seq 1 10); do
+    sleep 3
+    if [ "$(curl -s --max-time 8 "$TUNNEL_URL/health" 2>/dev/null || true)" = "ok" ]; then
+      TUNNEL_CHECK="ok"
+      break
+    fi
+  done
+  return 0
+}
+
+ACCESS="langsung (port $PORT)"
+OUT_URL="http://${PUBLIC_IP:-IP_PUBLIK_VPS}:$PORT"
+TUNNEL_URL=""
+TUNNEL_CHECK=""
+if [ "$TUNNEL" = "1" ]; then
+  echo
+  echo "== Membuka terowongan (port $PORT tidak perlu dibuka dari luar) =="
+  if start_tunnel; then
+    ACCESS="terowongan"
+    OUT_URL="$TUNNEL_URL"
+    echo "  Alamat      : $TUNNEL_URL"
+    echo "  Cek alamat  : $TUNNEL_CHECK"
+    echo "  Catatan     : alamat ini BERGANTI bila VPS/layanan dinyalakan ulang."
+    echo "                Lihat alamat terbaru: bash install.sh url"
+  else
+    ACCESS="terowongan GAGAL, memakai alamat langsung"
+  fi
+else
+  stop_tunnel
+fi
+
 echo
 echo "======== KIRIM BAGIAN INI KE AGEN ========"
 echo "HASIL TES:$RESULT"
-echo "PROXY_URL=http://${PUBLIC_IP:-IP_PUBLIK_VPS}:$PORT"
+echo "AKSES: $ACCESS"
+echo "PROXY_URL=$OUT_URL"
 echo "PROXY_KEY=$KEY"
 echo "=========================================="
