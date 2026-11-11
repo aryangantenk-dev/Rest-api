@@ -11,7 +11,8 @@ export type CategoryId =
   | "canvas"
   | "search"
   | "downloader"
-  | "games";
+  | "games"
+  | "film";
 
 export type Param = {
   name: string;

@@ -57,7 +57,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ action: string 
       const deob = sp.get("deob");
       if (deob) {
         // Dekode string-array (base64 alfabet terbalik + RC4) tanpa menjalankan kode situs.
-        const m = new RegExp(`function ${deob.replace(/[^\\w$]/g, "")}\\(\\)\\{(?:const|var|let) [\\w$]+=\\[([^\\]]*)\\]`).exec(text);
+        const m = new RegExp(`function ${deob.replace(/[^\w$]/g, "")}\\(\\)\\{(?:const|var|let) [\\w$]+=\\[([^\\]]*)\\]`).exec(text);
         if (!m) return json(200, { result: { error: "array tidak ditemukan" } });
         const arr = [...m[1].matchAll(/"([^"]*)"|'([^']*)'/g)].map((x) => x[1] ?? x[2]);
         const AB = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/";

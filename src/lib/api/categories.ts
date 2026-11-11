@@ -100,6 +100,13 @@ export const categories: Category[] = [
     description: "Scraper anime-kuindo.com: episode terbaru, pencarian, metadata anime, daftar episode, dan link player video siap pasang di iframe.",
     seoTitle: "REST API Anime: Scraper Animekuindo, Link Player & Embed",
   },
+  {
+    id: "film",
+    name: "Film",
+    tagline: "LK21 & pemeran",
+    description: "Scraper film LK21 (Layarkaca21): beranda, daftar film, genre, detail film dan serial, daftar pemeran, serta film per pemeran. Berjalan lewat server perantara (VPS) milik pemilik API.",
+    seoTitle: "REST API Film: Scraper LK21, Detail Film & Daftar Pemeran",
+  },
 ];
 
 export const categoryById = Object.fromEntries(categories.map((c) => [c.id, c])) as Record<CategoryId, Category>;
