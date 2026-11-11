@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { adminBan, adminListBans, adminUnban } from "@/lib/guard";
-import { viaProxy } from "@/lib/api/filmproxy"; // TEMP-PROBE
+import { viaProxy, sankaDecode } from "@/lib/api/filmproxy"; // TEMP-PROBE
 import { load } from "cheerio"; // TEMP-PROBE
 
 export const dynamic = "force-dynamic";
@@ -46,6 +46,35 @@ export async function GET(req: Request, ctx: { params: Promise<{ action: string 
         } catch (e) {
           return json(200, { result: { fetchError: String((e as Error)?.cause ?? e) } });
         }
+      }
+      const sanka = sp.get("sanka");
+      if (sanka) {
+        // Bentuk (skeleton) jawaban backend SankaMovies; via=proxy untuk lewat VPS.
+        const u = `https://www.sankavollerei.web.id/plananimek/movie${sanka}`;
+        const hdr = { accept: "application/json, text/plain, */*", "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36", referer: "https://sankanime.web.id/", origin: "https://sankanime.web.id" };
+        let status = 0, body = "";
+        try {
+          if (sp.get("via") === "proxy") {
+            const pr = await viaProxy(u, { accept: hdr.accept, referer: hdr.referer, origin: true });
+            status = pr.status; body = pr.text;
+          } else {
+            const fr = await fetch(u, { headers: hdr, cache: "no-store", signal: AbortSignal.timeout(20000) });
+            status = fr.status; body = await fr.text();
+          }
+        } catch (e) {
+          return json(200, { result: { fetchError: String((e as Error)?.cause ?? (e as Error)?.message ?? e) } });
+        }
+        let data: unknown;
+        try { data = sankaDecode(body); } catch { return json(200, { result: { status, raw: body.slice(0, 600).replace(/</g, "[[") } }); }
+        const sl = Number(sp.get("sl") || 70);
+        const al = Number(sp.get("al") || 1);
+        const shape = (v: unknown, d: number): unknown => {
+          if (typeof v === "string") return v.length > sl ? v.slice(0, sl) + `…(${v.length})` : v;
+          if (Array.isArray(v)) return v.length ? [...v.slice(0, al).map((x) => shape(x, d + 1)), `…len=${v.length}`] : [];
+          if (v && typeof v === "object") return d > 7 ? "{…}" : Object.fromEntries(Object.entries(v).map(([k, x]) => [k, shape(x, d + 1)]));
+          return v;
+        };
+        return json(200, { result: { status, length: body.length, shape: shape(data, 0) } });
       }
       let r;
       try {
