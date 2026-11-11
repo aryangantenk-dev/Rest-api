@@ -100,6 +100,13 @@ export const categories: Category[] = [
     description: "Scraper anime-kuindo.com: episode terbaru, pencarian, metadata anime, daftar episode, dan link player video siap pasang di iframe.",
     seoTitle: "REST API Anime: Scraper Animekuindo, Link Player & Embed",
   },
+  {
+    id: "film",
+    name: "Film",
+    tagline: "Scraper IDLIX & pemeran",
+    description: "Scraper IDLIX (z2.idlixku.com): beranda, pencarian, katalog film dan serial, genre, detail lengkap, daftar pemeran beserta foto, dan daftar episode tiap season.",
+    seoTitle: "REST API Film: Scraper IDLIX, Detail Film & Daftar Pemeran",
+  },
 ];
 
 export const categoryById = Object.fromEntries(categories.map((c) => [c.id, c])) as Record<CategoryId, Category>;

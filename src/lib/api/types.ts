@@ -8,6 +8,7 @@ export type CategoryId =
   | "info"
   | "komik"
   | "anime"
+  | "film"
   | "canvas"
   | "search"
   | "downloader"

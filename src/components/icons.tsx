@@ -111,6 +111,13 @@ export function CategoryIcon({ id, className }: { id: CategoryId } & P) {
           <path d="M8 21h8" />
         </svg>
       );
+    case "film":
+      return (
+        <svg {...base} className={className}>
+          <rect x="3" y="4" width="18" height="16" rx="2.5" />
+          <path d="M7.500 4v16M16.500 4v16M3 9h4.500M3 15h4.500M16.500 9H21M16.500 15H21" />
+        </svg>
+      );
   }
 }
 
