@@ -60,22 +60,31 @@ function kindOf(o: J, fallback: Kind | null = null): Kind {
 const pageUrl = (kind: Kind, slug: string) => `${BASE}/${kind === "movie" ? "movie" : "series"}/${slug}`;
 const episodeUrl = (slug: string, s: number, e: number) => `${BASE}/series/${slug}/season/${s}/episode/${e}`;
 
+/** Variasi header: identitas polos dulu, lalu header mirip browser. */
+const HEADER_SETS: Record<string, string>[] = [
+  { accept: "application/json, text/plain, */*", origin: BASE, referer: `${BASE}/` },
+  browserHeaders(`${BASE}/`, { accept: "application/json, text/plain, */*", origin: BASE }),
+];
+
 async function api(path: string, params: Record<string, string | number | undefined> = {}): Promise<J> {
   const qs = Object.entries(params)
     .filter(([, v]) => v !== undefined && v !== "")
     .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
     .join("&");
   const url = `${BASE}/api/${path}${qs ? `?${qs}` : ""}`;
-  try {
-    const d = await fetchJson<unknown>(url, { headers: browserHeaders(`${BASE}/`, { accept: "application/json", origin: BASE }) }, 15000);
-    if (!isObj(d)) throw new HttpError(502, "IDLIX mengirim respons yang tidak dikenali.");
-    return d;
-  } catch (e) {
-    if (e instanceof HttpError && e.status === 502 && /status (403|429|503)/.test(e.message)) {
-      throw new HttpError(502, "IDLIX menolak permintaan dari server ini (perlindungan Cloudflare). Coba lagi beberapa saat.");
+  let blocked: string | null = null;
+  for (const headers of HEADER_SETS) {
+    try {
+      const d = await fetchJson<unknown>(url, { headers }, 15000);
+      if (!isObj(d)) throw new HttpError(502, "IDLIX mengirim respons yang tidak dikenali.");
+      return d;
+    } catch (e) {
+      const m = e instanceof HttpError && e.status === 502 ? e.message.match(/status (403|429|503)/) : null;
+      if (!m) throw e;
+      blocked = m[1];
     }
-    throw e;
   }
+  throw new HttpError(502, `IDLIX menolak permintaan dari server ini (HTTP ${blocked}, perlindungan Cloudflare).`);
 }
 
 /** Kartu film/serial di daftar, pencarian, dan beranda. */
