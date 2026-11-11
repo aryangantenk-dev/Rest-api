@@ -1,6 +1,6 @@
 # Yanxz API
 
-REST API gratis tanpa API key (131 endpoint) beserta dokumentasi dan playground interaktif. Dibangun dengan Next.js 16 (App Router).
+REST API gratis tanpa API key (137 endpoint) beserta dokumentasi dan playground interaktif. Dibangun dengan Next.js 16 (App Router).
 
 ## Menjalankan lokal
 
@@ -120,3 +120,22 @@ Contoh memasang player di halaman sendiri:
 ```
 
 Kedua scraper membaca HTML situs sumber, jadi bisa berhenti bekerja kalau situs tersebut mengubah tampilannya atau memblokir IP server.
+
+## Scraper Film (LK21)
+
+| Endpoint | Keterangan |
+| --- | --- |
+| `/api/film/lk21-home` | Semua bagian beranda LK21: unggulan, film terbaru, serial, dan bagian per genre/negara. |
+| `/api/film/lk21-list?urut=&page=` | Daftar film. `urut`: `populer`, `terbaru`, `rating`, `rilis`, `komentar`, `unggulan`. 24 judul per halaman. |
+| `/api/film/lk21-genre?genre=…&page=` | Daftar film menurut `genre` (`action`), `negara` (`usa`), atau `tahun` (`2025`). Isi salah satu saja. |
+| `/api/film/lk21-detail?slug=…` | Detail film atau serial: sinopsis, rating, genre, negara, sutradara, pemeran, trailer, film terkait, dan daftar episode untuk serial. |
+| `/api/film/lk21-pemeran?slug=…` | Daftar pemeran dan sutradara sebuah judul, lengkap dengan tautan ke daftar film tiap orang. |
+| `/api/film/lk21-artis?slug=…&peran=&page=` | Semua film seorang pemeran (`peran=artis`) atau sutradara (`peran=sutradara`). |
+| `/api/search/lk21?q=…&page=&tipe=` | Cari judul di LK21 (`tipe`: `movie` atau `series`). Tidak butuh server perantara. |
+
+LK21 menolak IP server Vercel, jadi enam endpoint `/api/film/*` dititipkan lewat server perantara ("film-proxy") di VPS milik sendiri:
+
+1. Di VPS Ubuntu, jalankan `scripts/film-proxy/install.sh` sebagai root (tambahkan `TUNNEL=1` bila port VPS tidak bisa dijangkau dari luar). Skrip mengetes dulu apakah IP VPS diterima, lalu memasang layanan `film-proxy` dan mencetak `PROXY_URL` serta `PROXY_KEY`.
+2. Isi env `FILM_PROXY_URL` dan `FILM_PROXY_KEY` di hosting dengan dua nilai itu, lalu deploy ulang.
+
+Tanpa kedua env itu endpoint film menjawab 503, dan menjawab 502 selama VPS mati. Pada mode terowongan alamatnya berganti setiap layanan dinyalakan ulang, jadi `FILM_PROXY_URL` harus ikut diperbarui.

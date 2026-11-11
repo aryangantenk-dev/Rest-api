@@ -6,11 +6,15 @@ import { absUrl, clean, cleanSlug, imgSrc, type El } from "./scrape";
 import { proxyText } from "./filmproxy";
 
 /*
- * Kategori film. Kedua sumber menolak IP server Vercel, jadi semua permintaan
- * dititipkan lewat film-proxy di VPS (lihat ./filmproxy.ts dan scripts/film-proxy).
+ * Kategori film. LK21 menolak IP server Vercel, jadi semua permintaan dititipkan
+ * lewat film-proxy di VPS (lihat ./filmproxy.ts dan scripts/film-proxy).
  *
- *   - LK21      : https://tv12.lk21official.cc (film) + https://tv.nontondrama.vip (serial)
- *   - Sankanime : https://sankanime.web.id/movies (SankaMovies)
+ *   - LK21 : https://tv12.lk21official.cc (film) + https://tv.nontondrama.vip (serial)
+ *
+ * Catatan untuk sumber berikutnya (belum dipasang): data SankaMovies (sankanime.web.id/movies)
+ * berasal dari https://www.sankavollerei.web.id/plananimek/movie/{home,search,filter,trending,
+ * genres,detail/<type>/<id>,person/<id>}. Jawabannya dibungkus { "_encsankaa": base64url(zlib(JSON)) }
+ * dan host itu juga menolak IP Vercel, jadi perlu masuk ALLOW_HOSTS film-proxy lebih dulu.
  */
 
 /* ============================================================ LK21 ====== */

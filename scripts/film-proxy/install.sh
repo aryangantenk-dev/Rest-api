@@ -20,7 +20,7 @@
 set -euo pipefail
 
 PORT="${PORT:-8787}"
-ALLOW_HOSTS="${ALLOW_HOSTS:-lk21official.cc,nontondrama.vip,lk21.de,idlixku.com,sankanime.web.id}"
+ALLOW_HOSTS="${ALLOW_HOSTS:-lk21official.cc,nontondrama.vip,lk21.de,idlixku.com,sankanime.web.id,sankavollerei.web.id}"
 APP_DIR=/opt/film-proxy
 ENV_FILE=/etc/film-proxy.env
 UNIT=/etc/systemd/system/film-proxy.service
@@ -83,6 +83,7 @@ echo "== Tes akses situs film dari VPS ini =="
 check LK21 "https://tv12.lk21official.cc/avatar-2009"
 check IDLIX "https://z2.idlixku.com/api/genres" -H 'Accept: application/json' -H 'Origin: https://z2.idlixku.com' -e 'https://z2.idlixku.com/'
 check SANKANIME "https://sankanime.web.id/movies"
+check SANKA_API "https://www.sankavollerei.web.id/plananimek/movie/genres" -H 'Accept: application/json, text/plain, */*' -H 'Origin: https://sankanime.web.id' -e 'https://sankanime.web.id/'
 echo
 
 if [ "${TEST_ONLY:-}" = "1" ]; then

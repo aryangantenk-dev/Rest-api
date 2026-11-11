@@ -57,27 +57,3 @@ export async function proxyText(url: string, opts: ProxyOpts = {}, source = "Sit
   if (r.status < 200 || r.status >= 300) throw new HttpError(502, `${source} merespons dengan status ${r.status}.`);
   return r;
 }
-
-/* ------------------------------------------------------------------ Sanka */
-
-import { inflateSync } from "node:zlib";
-
-/**
- * Backend SankaMovies membungkus jawabannya sebagai { "_encsankaa": "<base64url dari zlib(JSON)>" }.
- * Fungsi ini mengembalikan JSON aslinya (atau objeknya sendiri bila tidak dibungkus).
- */
-export function sankaDecode(text: string): unknown {
-  let d: unknown;
-  try {
-    d = JSON.parse(text);
-  } catch {
-    throw new HttpError(502, "Sankanime mengirim jawaban yang bukan JSON.");
-  }
-  const enc = (d as { _encsankaa?: unknown } | null)?._encsankaa;
-  if (typeof enc !== "string") return d;
-  try {
-    return JSON.parse(inflateSync(Buffer.from(enc, "base64url")).toString("utf8"));
-  } catch {
-    throw new HttpError(502, "Jawaban Sankanime tidak bisa dibuka (format penyandiannya berubah).");
-  }
-}
