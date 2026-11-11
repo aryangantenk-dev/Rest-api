@@ -24,6 +24,10 @@ type PinRaw = {
   title?: string;
   grid_title?: string;
   description?: string;
+  auto_alt_text?: string;
+  seo_alt_text?: string;
+  link?: string | null;
+  domain?: string | null;
   images?: Record<string, PinImage>;
   pinner?: { username?: string; full_name?: string };
   board?: { name?: string };
@@ -57,7 +61,7 @@ function mapPin(p: PinRaw): PinResult | null {
   return {
     id: p.id ?? null,
     title: clean(p.title || p.grid_title) || null,
-    description: clean(p.description) || null,
+    description: clean(p.description || p.seo_alt_text || p.auto_alt_text) || null,
     image: img.url,
     thumbnail: p.images?.["236x"]?.url ?? null,
     width: img.width ?? null,

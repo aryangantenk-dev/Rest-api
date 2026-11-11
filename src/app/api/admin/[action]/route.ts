@@ -43,7 +43,12 @@ export async function GET(req: Request, ctx: { params: Promise<{ action: string 
         accept: sp.get("accept") || "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "accept-language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
       };
-      const r = await fetch(target, { headers, redirect: "follow", cache: "no-store", signal: AbortSignal.timeout(20000) });
+      for (const h of sp.getAll("h")) {
+        const i = h.indexOf(":");
+        if (i > 0) headers[h.slice(0, i).trim().toLowerCase()] = h.slice(i + 1).trim();
+      }
+      const postBody = sp.get("body");
+      const r = await fetch(target, { method: postBody === null ? "GET" : "POST", body: postBody ?? undefined, headers, redirect: "follow", cache: "no-store", signal: AbortSignal.timeout(20000) });
       const isText = /text|json|xml|javascript/.test(r.headers.get("content-type") || "");
       const text = isText ? await r.text() : "";
       const off = Number(sp.get("off") || 0);
@@ -54,6 +59,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ action: string 
         const re = new RegExp(find, "g");
         body = [...text.matchAll(re)].slice(0, 40).map((m) => text.slice(Math.max(0, m.index - Number(sp.get("pad") || 0)), m.index + m[0].length + Number(sp.get("pad") || 0))).join("\n@@@\n");
       }
+      body = body.replace(/</g, "[[").replace(/>/g, "]]");
       return json(200, { result: { status: r.status, final: r.url, type: r.headers.get("content-type"), length: text.length, body } });
     }
     // TEMP-PROBE-END
