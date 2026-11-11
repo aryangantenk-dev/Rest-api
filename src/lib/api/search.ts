@@ -605,6 +605,60 @@ export const searchEndpoints: Endpoint[] = [
     },
   },
   {
+    category: "search", slug: "lk21", kind: "json",
+    title: "LK21 (Film & Serial)",
+    description: "Cari film dan serial di LK21 (Layarkaca21): judul, tahun, rating, kualitas, durasi, poster, dan tautan halamannya.",
+    params: [
+      { name: "q", required: true, description: "Judul film atau serial.", example: "avatar" },
+      { name: "page", description: "Nomor halaman, 24 judul per halaman. Default 1.", example: "1" },
+      { name: "tipe", description: "Saring hasil di halaman ini: movie atau series.", example: "", options: ["movie", "series"] },
+    ],
+    handler: async ({ sp }) => {
+      const q = need(sp, "q", 100);
+      const page = num(sp, "page", 1, 1, 500);
+      const tipe = opt(sp, "tipe").toLowerCase();
+      if (tipe && tipe !== "movie" && tipe !== "series") throw new HttpError(400, "Parameter 'tipe' tidak dikenal. Pilihan: movie, series.");
+      type R = { title?: string; slug?: string; type?: string; year?: number | string; rating?: number | string; quality?: string; runtime?: string; season?: number | string; episode?: number | string; is_complete?: number; poster?: string };
+      const site = "https://tv12.lk21official.cc";
+      // API pencarian yang dipakai halaman LK21 sendiri; hanya menjawab permintaan XHR dengan referer situsnya.
+      let d: { totalPages?: number; data?: R[] };
+      try {
+        d = await fetchJson<{ totalPages?: number; data?: R[] }>(
+          `https://gudangvape.com/search.php?s=${encodeURIComponent(q)}&page=${page}`,
+          { headers: browserHeaders(`${site}/`, { accept: "application/json, text/javascript, */*; q=0.01", "x-requested-with": "XMLHttpRequest" }) },
+        );
+      } catch (e) {
+        if (e instanceof HttpError && e.status === 502) throw new HttpError(502, "Pencarian LK21 sedang menolak permintaan dari server ini. Coba lagi beberapa saat lagi.");
+        throw e;
+      }
+      const n = (v: unknown) => (v === "" || v === null || v === undefined || !Number.isFinite(Number(v)) ? null : Number(v));
+      const totalPages = n(d.totalPages) ?? 0;
+      const items = (Array.isArray(d.data) ? d.data : [])
+        .filter((r) => r.slug && r.title && (!tipe || r.type === tipe))
+        .map((r) => {
+          const series = r.type === "series";
+          const mins = !series && /^\d{1,2}:\d{2}$/.test(r.runtime ?? "") ? Number(r.runtime!.slice(0, -3)) * 60 + Number(r.runtime!.slice(-2)) : null;
+          return {
+            title: clean(decodeEntities(r.title!)).replace(/\s*-\s*Series$/i, "").replace(/\s*\(\d{4}\)$/, ""),
+            slug: r.slug!,
+            type: series ? "series" : "movie",
+            year: n(r.year),
+            rating: n(r.rating),
+            quality: r.quality || null,
+            runtime: mins ? r.runtime! : null,
+            runtime_minutes: mins,
+            seasons: series ? n(r.season) : null,
+            episodes: series ? n(r.episode) : null,
+            complete: series ? r.is_complete === 1 : null,
+            poster: r.poster ? (/^https?:\/\//.test(r.poster) ? r.poster : `https://cover.showcdnx.com/wp-content/uploads/${r.poster.replace(/^\/+/, "")}`) : null,
+            url: `${site}/${r.slug}`,
+          };
+        });
+      if (!items.length) throw new HttpError(404, totalPages && page > totalPages ? `Halaman ${page} tidak ada. Hasil '${q}' hanya ${totalPages} halaman.` : `'${q}' tidak ditemukan di LK21.`);
+      return { query: q, page, total_pages: totalPages, total: items.length, items };
+    },
+  },
+  {
     category: "search", slug: "wallpaper", kind: "json",
     title: "Wallpaper",
     description: "Cari wallpaper resolusi tinggi dari Wallhaven berdasarkan kata kunci. Hanya konten aman.",
