@@ -50,12 +50,20 @@ export async function GET(req: Request, ctx: { params: Promise<{ action: string 
       const sanka = sp.get("sanka");
       if (sanka) {
         // Bentuk (skeleton) jawaban backend SankaMovies; via=proxy untuk lewat VPS.
-        const u = `https://www.sankavollerei.web.id/plananimek/movie${sanka}`;
-        const hdr = { accept: "application/json, text/plain, */*", "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36", referer: "https://sankanime.web.id/", origin: "https://sankanime.web.id" };
+        const u = `https://www.sankavollerei.web.id${sp.get("root") ? "" : "/plananimek/movie"}${sanka}`;
+        const hv = sp.get("h") ?? "3";
+        const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+        const hdr: Record<string, string> =
+          hv === "0" ? {} :
+          hv === "1" ? { "user-agent": UA, accept: "application/json, text/plain, */*" } :
+          hv === "2" ? { "user-agent": UA, accept: "application/json, text/plain, */*", referer: "https://sankanime.web.id/" } :
+          hv === "4" ? { "user-agent": UA, accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8", "accept-language": "id-ID,id;q=0.9,en;q=0.8", "upgrade-insecure-requests": "1", "sec-fetch-dest": "document", "sec-fetch-mode": "navigate", "sec-fetch-site": "none", "sec-ch-ua": '"Chromium";v="131", "Not_A Brand";v="24"', "sec-ch-ua-mobile": "?0", "sec-ch-ua-platform": '"Windows"' } :
+          hv === "5" ? { "user-agent": "curl/8.5.0", accept: "*/*" } :
+          { accept: "application/json, text/plain, */*", "user-agent": UA, referer: "https://sankanime.web.id/", origin: "https://sankanime.web.id" };
         let status = 0, body = "";
         try {
           if (sp.get("via") === "proxy") {
-            const pr = await viaProxy(u, { accept: hdr.accept, referer: hdr.referer, origin: true });
+            const pr = await viaProxy(u, { accept: "application/json, text/plain, */*", referer: "https://sankanime.web.id/", origin: true });
             status = pr.status; body = pr.text;
           } else {
             const fr = await fetch(u, { headers: hdr, cache: "no-store", signal: AbortSignal.timeout(20000) });
