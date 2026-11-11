@@ -465,10 +465,11 @@ function lkEmbedHtml(title: string, url: string): string {
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
 <title>${escapeHtml(title)}</title>
-<style>html,body{margin:0;height:100%;background:#000;overflow:hidden}iframe{position:fixed;inset:0;width:100%;height:100%;border:0}</style>
+<style>html,body{margin:0;height:100%;background:#000;overflow:hidden}iframe{position:fixed;inset:0;width:100%;height:100%;border:0}.sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}</style>
 </head>
 <body>
-<iframe src="${escapeHtml(url)}" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; screen-wake-lock" allowfullscreen></iframe>
+<div class="sr"><h1>${escapeHtml(title)}</h1><p>Player video: <a href="${escapeHtml(url)}" rel="noreferrer">${escapeHtml(url)}</a></p></div>
+<iframe src="${escapeHtml(url)}" title="${escapeHtml(title)}" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; screen-wake-lock" allowfullscreen></iframe>
 </body>
 </html>`;
 }
