@@ -8,7 +8,6 @@ import { islamiEndpoints } from "./islami";
 import { infoEndpoints } from "./info";
 import { komikEndpoints } from "./komik";
 import { animeEndpoints } from "./anime";
-import { filmEndpoints } from "./film";
 import { canvasEndpoints } from "./canvas";
 import { searchEndpoints } from "./search";
 import { downloaderEndpoints } from "./downloader";
@@ -29,7 +28,6 @@ export const endpoints: Endpoint[] = [
   ...infoEndpoints,
   ...komikEndpoints,
   ...animeEndpoints,
-  ...filmEndpoints,
 ];
 
 const index = new Map(endpoints.map((e) => [`${e.category}/${e.slug}`, e]));
