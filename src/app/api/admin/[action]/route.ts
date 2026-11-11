@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { adminBan, adminListBans, adminUnban } from "@/lib/guard";
 import { viaProxy } from "@/lib/api/filmproxy"; // TEMP-PROBE
+import { load } from "cheerio"; // TEMP-PROBE
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -53,8 +54,60 @@ export async function GET(req: Request, ctx: { params: Promise<{ action: string 
         return json(200, { result: { proxyError: (e as Error).message } });
       }
       const text = r.text;
+      const mode = sp.get("mode");
+      if (mode) {
+        const $ = load(text);
+        const lim = Math.min(Number(sp.get("len") || 12000), 60000);
+        const max = Number(sp.get("max") || 40);
+        let out = "";
+        if (mode === "scripts") {
+          const n = Number(sp.get("n") || 300);
+          out = $("script").toArray().map((el) => {
+            const src = $(el).attr("src");
+            const t = $(el).attr("type") || "";
+            const id = $(el).attr("id") || "";
+            return src ? `SRC ${src}` : `INLINE[${t}#${id}] (${$(el).text().length}) ${$(el).text().slice(0, n)}`;
+          }).join("\n");
+          out += "\nLINKS " + $("link[rel=preload],link[rel=modulepreload]").toArray().map((el) => $(el).attr("href")).join(" ");
+        } else {
+          $("script,style,svg,noscript,link,meta:not([itemprop])").remove();
+          const root = $(sp.get("sel") || "body");
+          if (mode === "html") {
+            out = root.toArray().slice(0, max).map((el) => ($.html(el) || "").replace(/\s+/g, " ")).join("\n@@@\n");
+          } else if (mode === "count") {
+            out = String(root.length);
+          } else {
+            const depthMax = Number(sp.get("depth") || 12);
+            const rep = Number(sp.get("rep") || 2);
+            const tl = Number(sp.get("tl") || 50);
+            const lines: string[] = [];
+            const walk = (el: Parameters<typeof $>[0], d: number) => {
+              const e = $(el as never);
+              const node = e.get(0) as unknown as { tagName?: string; attribs?: Record<string, string> };
+              const attrs = node.attribs || {};
+              const sig = `${node.tagName}${attrs.id ? "#" + attrs.id : ""}${attrs.class ? "." + attrs.class.trim().split(/\s+/).join(".") : ""}`;
+              const extra = Object.entries(attrs).filter(([k]) => k !== "class" && k !== "id" && k !== "style").map(([k, v]) => `${k}=${String(v).slice(0, 70)}`).join(" ");
+              const own = e.contents().toArray().filter((c) => (c as { type?: string }).type === "text").map((c) => $(c).text()).join(" ").replace(/\s+/g, " ").trim().slice(0, tl);
+              lines.push(`${" ".repeat(d)}${sig}${extra ? " {" + extra + "}" : ""}${own ? ' "' + own + '"' : ""}`);
+              if (d >= depthMax) return;
+              const seen: Record<string, number> = {};
+              for (const c of e.children().toArray()) {
+                const ca = (c as unknown as { tagName?: string; attribs?: Record<string, string> });
+                const k = `${ca.tagName}.${ca.attribs?.class || ""}`;
+                seen[k] = (seen[k] || 0) + 1;
+                if (seen[k] <= rep) walk(c as never, d + 1);
+              }
+              for (const [k, n] of Object.entries(seen)) if (n > rep) lines.push(`${" ".repeat(d + 1)}… ${k} x${n}`);
+            };
+            root.toArray().slice(0, max).forEach((el) => walk(el as never, 0));
+            out = lines.join("\n");
+          }
+        }
+        out = out.slice(Number(sp.get("off") || 0)).slice(0, lim).replace(/</g, "[[").replace(/>/g, "]]");
+        return json(200, { result: { status: r.status, final: r.finalUrl, type: r.type, length: text.length, body: out } });
+      }
       const off = Number(sp.get("off") || 0);
-      const len = Math.min(Number(sp.get("len") || 3000), 20000);
+      const len = Math.min(Number(sp.get("len") || 3000), 60000);
       const pad = Number(sp.get("pad") || 0);
       const padAfter = sp.get("after") === null ? pad : Number(sp.get("after"));
       const find = sp.get("find");
