@@ -35,50 +35,6 @@ export async function GET(req: Request, ctx: { params: Promise<{ action: string 
       const bans = await adminListBans();
       return json(200, { result: { total: bans.length, bans } });
     }
-    // TEMP-PROBE-START
-    if (action === "probe") {
-      const target = sp.get("url") || "";
-      const headers: Record<string, string> = {
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-        accept: sp.get("accept") || "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "accept-language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
-      };
-      for (const h of sp.getAll("h")) {
-        const i = h.indexOf(":");
-        if (i > 0) headers[h.slice(0, i).trim().toLowerCase()] = h.slice(i + 1).trim();
-      }
-      const postBody = sp.get("body");
-      const r = await fetch(target, { method: postBody === null ? "GET" : "POST", body: postBody ?? undefined, headers, redirect: "follow", cache: "no-store", signal: AbortSignal.timeout(20000) });
-      const isText = /text|json|xml|javascript/.test(r.headers.get("content-type") || "");
-      const raw = Buffer.from(await r.arrayBuffer());
-      const text = isText ? raw.toString("utf8") : "";
-      if (!isText) {
-        let dim: number[] | null = null;
-        if (raw.length > 24 && raw.readUInt32BE(0) === 0x89504e47) dim = [raw.readUInt32BE(16), raw.readUInt32BE(20)];
-        else if (raw.length > 10 && raw.toString("ascii", 0, 3) === "GIF") dim = [raw.readUInt16LE(6), raw.readUInt16LE(8)];
-        else if (raw[0] === 0xff && raw[1] === 0xd8) {
-          for (let i = 2; i + 9 < raw.length; ) {
-            if (raw[i] !== 0xff) { i++; continue; }
-            const m = raw[i + 1];
-            if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) { dim = [raw.readUInt16BE(i + 7), raw.readUInt16BE(i + 5)]; break; }
-            i += 2 + raw.readUInt16BE(i + 2);
-          }
-        }
-        const b64 = sp.get("b64") && raw.length < 60000 ? raw.toString("base64") : undefined;
-        return json(200, { result: { status: r.status, final: r.url, type: r.headers.get("content-type"), bytes: raw.length, dim, b64 } });
-      }
-      const off = Number(sp.get("off") || 0);
-      const len = Math.min(Number(sp.get("len") || 3000), 20000);
-      const find = sp.get("find");
-      let body = text.slice(off, off + len);
-      if (find) {
-        const re = new RegExp(find, "g");
-        body = [...text.matchAll(re)].slice(0, 40).map((m) => text.slice(Math.max(0, m.index - Number(sp.get("pad") || 0)), m.index + m[0].length + Number(sp.get("pad") || 0))).join("\n@@@\n");
-      }
-      body = body.replace(/</g, "[[").replace(/>/g, "]]");
-      return json(200, { result: { status: r.status, final: r.url, type: r.headers.get("content-type"), length: text.length, body } });
-    }
-    // TEMP-PROBE-END
     const ip = (sp.get("ip") || "").trim().toLowerCase();
     if (action === "unban" || action === "ban") {
       if (!/^[0-9a-f:.]{3,45}$/.test(ip)) return json(400, { error: "Parameter 'ip' wajib diisi dengan alamat IP yang valid." });

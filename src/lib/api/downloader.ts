@@ -516,7 +516,7 @@ export const downloaderEndpoints: Endpoint[] = [
     category: "downloader", slug: "twitter", kind: "json",
     title: "Twitter / X",
     description: "Ambil video (semua resolusi) dan foto dari sebuah tweet, lengkap dengan teks dan statistiknya.",
-    params: urlParam("https://x.com/NASA/status/1410624005669855233"),
+    params: urlParam("https://x.com/BarackObama/status/266031293945503744"),
     handler: async ({ sp }) => twitter(target(sp)),
   },
   {
@@ -530,14 +530,14 @@ export const downloaderEndpoints: Endpoint[] = [
     category: "downloader", slug: "mediafire", kind: "json",
     title: "MediaFire",
     description: "Ubah tautan halaman MediaFire menjadi tautan unduh langsung beserta nama dan ukuran berkas.",
-    params: urlParam("https://www.mediafire.com/file/xxxxxxxxxxxxxxx/contoh.zip/file"),
+    params: urlParam("https://www.mediafire.com/file/k4makp2pk726bmb/Fonts.zip"),
     handler: async ({ sp }) => mediafire(target(sp)),
   },
   {
     category: "downloader", slug: "gdrive", kind: "json",
     title: "Google Drive",
     description: "Ubah tautan berbagi Google Drive menjadi tautan unduh langsung, termasuk berkas besar yang butuh konfirmasi.",
-    params: urlParam("https://drive.google.com/file/d/1ZdR3L3qP4Bkq8noWLJHSr_iBau0DNT4Kli4SxNc2YEo/view"),
+    params: urlParam("https://drive.google.com/file/d/1l_5RK28JRL19wpT22B-DY9We3TVXnnQQ/view"),
     handler: async ({ sp }) => gdrive(target(sp)),
   },
   {

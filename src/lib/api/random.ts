@@ -233,20 +233,6 @@ const moreEndpoints: Endpoint[] = [
     },
   },
   {
-    category: "random", slug: "waifu", kind: "json",
-    title: "Waifu",
-    description: "Gambar karakter anime acak dari waifu.pics dalam berbagai kategori yang aman untuk semua umur.",
-    params: [{ name: "tipe", description: "waifu, neko, shinobu, megumin, atau awoo. Default waifu.", example: "waifu" }, redirectParam],
-    handler: async ({ sp }) => {
-      const types = ["waifu", "neko", "shinobu", "megumin", "awoo"];
-      const tipe = opt(sp, "tipe", "waifu").toLowerCase();
-      if (!types.includes(tipe)) throw new HttpError(400, `Tipe tidak dikenal. Pilihan: ${types.join(", ")}.`);
-      const d = await fetchJson<{ url?: string }>(`https://api.waifu.pics/sfw/${tipe}`);
-      if (!d.url) throw new HttpError(502, "Sumber gambar tidak mengirim hasil.");
-      return imageOut(sp, { type: tipe, image: d.url });
-    },
-  },
-  {
     category: "random", slug: "cat", kind: "json",
     title: "Foto Kucing",
     description: "Foto kucing acak yang menggemaskan beserta ukuran gambarnya.",
