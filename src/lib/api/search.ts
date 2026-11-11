@@ -202,12 +202,32 @@ function bingTarget(href: string): string {
 }
 
 async function bingSearch(q: string): Promise<WebHit[]> {
-  const { $ } = await fetchPage(`https://www.bing.com/search?q=${encodeURIComponent(q)}&setlang=id&cc=ID&count=30`, "https://www.bing.com/");
+  // Tanpa parameter cc/count: dengan keduanya Bing sering mengirim halaman tanpa hasil ke IP server.
+  const { $ } = await fetchPage(`https://www.bing.com/search?q=${encodeURIComponent(q)}&setlang=id`, "https://www.bing.com/");
   const items: WebHit[] = [];
   $("li.b_algo").each((_, r) => {
     const el = $(r);
     const a = el.find("h2 a").first();
     const hit = webHit(clean(a.text()), bingTarget(a.attr("href") ?? ""), clean(el.find(".b_caption p, p.b_lineclamp2, p").first().text()));
+    if (hit) items.push(hit);
+  });
+  return items;
+}
+
+async function yahooSearch(q: string): Promise<WebHit[]> {
+  const { $ } = await fetchPage(`https://search.yahoo.com/search?p=${encodeURIComponent(q)}`, "https://search.yahoo.com/");
+  const items: WebHit[] = [];
+  $("div.algo").each((_, r) => {
+    const el = $(r);
+    const a = el.find(".compTitle a[href]").first();
+    let href = a.attr("href") ?? "";
+    // Tautan dibungkus: https://r.search.yahoo.com/.../RU=<url ter-encode>/RK=...
+    const ru = /\/RU=([^/]+)\//.exec(href);
+    if (ru) {
+      try { href = decodeURIComponent(ru[1]); } catch { return; }
+    }
+    if (/(^|\.)yahoo\.com$/.test(href.replace(/^https?:\/\//, "").split("/")[0])) return;
+    const hit = webHit(clean(el.find("h3.title").first().text()) || clean(a.attr("aria-label")), href, clean(el.find(".compText p").first().text()));
     if (hit) items.push(hit);
   });
   return items;
@@ -475,10 +495,10 @@ export const searchEndpoints: Endpoint[] = [
   {
     category: "search", slug: "myanimelist", kind: "json",
     title: "MyAnimeList",
-    description: "Cari anime atau manga di MyAnimeList: skor, jumlah episode, status, genre, dan sinopsis.",
+    description: "Cari anime atau manga di MyAnimeList: skor, tipe, status, periode tayang, dan gambar sampul. Genre dan sinopsis ikut tampil bila sumber detail (Jikan) bisa dihubungi.",
     params: [
       { name: "q", required: true, description: "Judul yang dicari.", example: "one piece" },
-      { name: "tipe", description: "anime atau manga. Default anime.", example: "anime" },
+      { name: "tipe", description: "anime atau manga. Default anime.", example: "anime", options: ["anime", "manga"] },
       { name: "limit", description: "Jumlah hasil, 1 sampai 15. Default 5.", example: "5" },
     ],
     handler: async ({ sp }) => {
@@ -491,7 +511,44 @@ export const searchEndpoints: Endpoint[] = [
         images?: { jpg?: { large_image_url?: string; image_url?: string } }; aired?: { string?: string }; published?: { string?: string };
         studios?: { name: string }[]; authors?: { name: string }[];
       };
-      const d = await fetchJson<{ data?: A[] }>(`https://api.jikan.moe/v4/${tipe}?q=${encodeURIComponent(q)}&limit=${num(sp, "limit", 5, 1, 15)}&sfw=true`);
+      const limit = num(sp, "limit", 5, 1, 15);
+      let d: { data?: A[] } = {};
+      try {
+        d = await fetchJson<{ data?: A[] }>(`https://api.jikan.moe/v4/${tipe}?q=${encodeURIComponent(q)}&limit=${limit}&sfw=true`, undefined, 6000);
+      } catch (e) {
+        if (e instanceof HttpError && e.status === 400) throw e;
+      }
+      if (!d.data?.length) {
+        // Jikan sering tidak bisa dihubungi dari server; pakai pencarian bawaan MyAnimeList.
+        type M = { id: number; name: string; url: string; image_url?: string; payload?: { media_type?: string; start_year?: number; aired?: string; published?: string; score?: string; status?: string } };
+        const m = await fetchJson<{ categories?: { type?: string; items?: M[] }[] }>(
+          `https://myanimelist.net/search/prefix.json?type=${tipe}&keyword=${encodeURIComponent(q)}&v=1`,
+          { headers: { ...browserHeaders("https://myanimelist.net/"), accept: "application/json" } },
+        );
+        const list = (m.categories ?? []).filter((c) => c.type === tipe).flatMap((c) => c.items ?? []).slice(0, limit);
+        if (!list.length) throw new HttpError(404, `'${q}' tidak ditemukan di MyAnimeList.`);
+        return {
+          query: q, type: tipe, source: "myanimelist", total: list.length,
+          items: list.map((a) => ({
+            id: a.id,
+            title: a.name,
+            title_english: null,
+            title_japanese: null,
+            type: a.payload?.media_type ?? null,
+            ...(tipe === "anime" ? { episodes: null, studios: [] } : { chapters: null, volumes: null, authors: [] }),
+            status: a.payload?.status ?? null,
+            score: Number(a.payload?.score) || null,
+            rank: null,
+            year: a.payload?.start_year || null,
+            period: a.payload?.aired ?? a.payload?.published ?? null,
+            genres: [],
+            // Buang awalan thumbnail (/r/116x180) dan tanda tangan supaya dapat gambar ukuran penuh.
+            image: a.image_url ? a.image_url.replace(/\/r\/\d+x\d+\//, "/").replace(/\?.*$/, "") : null,
+            synopsis: null,
+            url: a.url,
+          })),
+        };
+      }
       const items = (d.data ?? []).map((a) => ({
         id: a.mal_id,
         title: a.title,
@@ -510,19 +567,22 @@ export const searchEndpoints: Endpoint[] = [
         url: a.url,
       }));
       if (!items.length) throw new HttpError(404, `'${q}' tidak ditemukan di MyAnimeList.`);
-      return { query: q, type: tipe, total: items.length, items };
+      return { query: q, type: tipe, source: "jikan", total: items.length, items };
     },
   },
   {
     category: "search", slug: "steam", kind: "json",
     title: "Steam",
     description: "Cari game di Steam Store beserta harga dalam Rupiah, diskon, dan platform yang didukung.",
-    params: [{ name: "q", required: true, description: "Nama game.", example: "stardew valley" }],
+    params: [
+      { name: "q", required: true, description: "Nama game.", example: "stardew valley" },
+      { name: "limit", description: "Jumlah hasil, 1 sampai 10. Default 10.", example: "5" },
+    ],
     handler: async ({ sp }) => {
       const q = need(sp, "q", 100);
       type G = { id: number; name: string; tiny_image?: string; metascore?: string; price?: { currency?: string; initial?: number; final?: number }; platforms?: Record<string, boolean> };
       const d = await fetchJson<{ items?: G[] }>(`https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(q)}&cc=id&l=indonesian`);
-      const items = (d.items ?? []).map((g) => {
+      const items = (d.items ?? []).slice(0, num(sp, "limit", 10, 1, 10)).map((g) => {
         const init = g.price?.initial ?? 0;
         const fin = g.price?.final ?? 0;
         return {
@@ -616,7 +676,7 @@ export const searchEndpoints: Endpoint[] = [
   {
     category: "search", slug: "web", kind: "json",
     title: "Pencarian Web",
-    description: "Hasil pencarian web: judul, tautan, dan cuplikan. Memakai Bing, dengan DuckDuckGo sebagai cadangan.",
+    description: "Hasil pencarian web: judul, tautan, dan cuplikan. Memakai Bing, dengan Yahoo dan DuckDuckGo sebagai cadangan.",
     params: [
       { name: "q", required: true, description: "Kata kunci pencarian.", example: "cara membuat bot whatsapp" },
       { name: "limit", description: "Jumlah hasil, 1 sampai 20. Default 10.", example: "5" },
@@ -624,19 +684,21 @@ export const searchEndpoints: Endpoint[] = [
     handler: async ({ sp }) => {
       const q = need(sp, "q", 200);
       const limit = num(sp, "limit", 10, 1, 20);
-      let source = "bing";
+      // Mesin pencari kadang menolak IP server; coba berurutan sampai ada yang memberi hasil.
+      const engines: [string, (query: string) => Promise<WebHit[]>][] = [
+        ["bing", bingSearch], ["yahoo", yahooSearch], ["duckduckgo", ddgSearch], ["bing", bingSearch],
+      ];
+      let source = "";
       let items: WebHit[] = [];
-      try {
-        items = await bingSearch(q);
-      } catch {
-        /* lanjut ke cadangan */
-      }
-      if (!items.length) {
-        source = "duckduckgo";
+      for (const [name, run] of engines) {
         try {
-          items = await ddgSearch(q);
+          items = await run(q);
         } catch {
-          /* ditangani di bawah */
+          items = [];
+        }
+        if (items.length) {
+          source = name;
+          break;
         }
       }
       const out = items.slice(0, limit);
