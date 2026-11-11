@@ -54,6 +54,46 @@ export async function GET(req: Request, ctx: { params: Promise<{ action: string 
         return json(200, { result: { proxyError: (e as Error).message } });
       }
       const text = r.text;
+      const deob = sp.get("deob");
+      if (deob) {
+        // Dekode string-array (base64 alfabet terbalik + RC4) tanpa menjalankan kode situs.
+        const m = new RegExp(`function ${deob.replace(/[^\\w$]/g, "")}\\(\\)\\{(?:const|var|let) [\\w$]+=\\[([^\\]]*)\\]`).exec(text);
+        if (!m) return json(200, { result: { error: "array tidak ditemukan" } });
+        const arr = [...m[1].matchAll(/"([^"]*)"|'([^']*)'/g)].map((x) => x[1] ?? x[2]);
+        const AB = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/";
+        const b64 = (str: string) => {
+          const bytes: number[] = [];
+          let bs = 0, bc = 0;
+          for (const ch of str) {
+            const v = AB.indexOf(ch);
+            if (v < 0) continue;
+            bs = bc % 4 ? bs * 64 + v : v;
+            if (bc++ % 4) bytes.push(255 & (bs >> ((-2 * bc) & 6)));
+          }
+          return Buffer.from(bytes).toString("utf8");
+        };
+        const rc4 = (enc: string, key: string) => {
+          const str = b64(enc);
+          const S = Array.from({ length: 256 }, (_, i) => i);
+          let j = 0;
+          for (let i = 0; i < 256; i++) { j = (j + S[i] + key.charCodeAt(i % key.length)) % 256; [S[i], S[j]] = [S[j], S[i]]; }
+          let i = 0; j = 0; let out = "";
+          for (let y = 0; y < str.length; y++) {
+            i = (i + 1) % 256; j = (j + S[i]) % 256; [S[i], S[j]] = [S[j], S[i]];
+            out += String.fromCharCode(str.charCodeAt(y) ^ S[(S[i] + S[j]) % 256]);
+          }
+          return out;
+        };
+        const ok = new RegExp(sp.get("ok") || "^[A-Za-z0-9+/=]{2,24}$");
+        const lines = (sp.get("pieces") || "").split("~").filter(Boolean).map((pc) => {
+          const k = pc.indexOf(":");
+          const n = Number(pc.slice(0, k));
+          const key = pc.slice(k + 1);
+          const c = arr.map((e, idx) => ({ idx, t: rc4(e, key) })).filter((x) => ok.test(x.t));
+          return `${n} ${key} => ${c.map((x) => `[${x.idx} d=${x.idx - n}] ${x.t}`).join(" | ")}`;
+        });
+        return json(200, { result: { n: arr.length, lines } });
+      }
       const mode = sp.get("mode");
       if (mode) {
         const $ = load(text);
