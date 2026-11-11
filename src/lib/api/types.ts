@@ -18,6 +18,8 @@ export type Param = {
   required?: boolean;
   description: string;
   example?: string;
+  /** Pilihan tetap; di halaman docs ditampilkan sebagai tombol pilihan, bukan kotak teks. */
+  options?: string[];
 };
 
 export type Ctx = {

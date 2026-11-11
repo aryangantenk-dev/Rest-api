@@ -55,7 +55,7 @@ export const categories: Category[] = [
     id: "search",
     name: "Search",
     tagline: "Cari di banyak situs",
-    description: "Pencarian Pinterest, Lahelu, MCPEDL, CNN Indonesia, YouTube, TikTok, MyAnimeList, Steam, wallpaper, GitHub, dan web dalam format JSON yang rapi.",
+    description: "Pencarian Pinterest, Lahelu, MCPEDL, CNN Indonesia, YouTube, MyAnimeList, Steam, wallpaper, GitHub, npm, dan web dalam format JSON yang rapi.",
     seoTitle: "REST API Search: Pinterest, Lahelu, MCPEDL, CNN, YouTube",
   },
   {

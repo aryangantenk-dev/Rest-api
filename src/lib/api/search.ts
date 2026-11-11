@@ -1,7 +1,7 @@
 import type { Endpoint } from "./types";
 import { HttpError } from "./types";
 import { fetchJson, fetchRaw, need, num, opt } from "./helpers";
-import { absUrl, browserHeaders, clean, fetchPage, imgSrc } from "./scrape";
+import { browserHeaders, clean, fetchPage } from "./scrape";
 
 const UA = browserHeaders("https://www.google.com/")["user-agent"];
 
@@ -172,6 +172,65 @@ function walk(node: unknown, out: YtVideo[], depth = 0): void {
 
 /* ---------------------------------- Endpoint ---------------------------------- */
 
+/* ------------------------------ MCPEDL & pencarian web ------------------------------ */
+
+const MCPEDL_SORT: Record<string, string> = { relevan: "relevance", populer: "popularity_all", terbaru: "created_at", diperbarui: "updated_at" };
+const MCPEDL_TYPES: Record<number, string> = {
+  1: "Add-On", 2: "World", 3: "Texture Pack", 4: "Seed", 5: "Skin", 6: "Skin Pack", 7: "Server", 8: "ModPE", 9: "Script",
+};
+
+type WebHit = { title: string; url: string; domain: string; snippet: string | null };
+
+function webHit(title: string, href: string, snippet: string): WebHit | null {
+  if (!title || !/^https?:\/\//.test(href)) return null;
+  let domain: string;
+  try { domain = new URL(href).hostname.replace(/^www\./, ""); } catch { return null; }
+  return { title: decodeEntities(title), url: href, domain, snippet: snippet || null };
+}
+
+/** Bing membungkus tautan hasil sebagai /ck/a?...&u=a1<base64url>; kembalikan URL aslinya. */
+function bingTarget(href: string): string {
+  try {
+    const u = new URL(href, "https://www.bing.com");
+    if (!/(^|\.)bing\.com$/.test(u.hostname) || !u.pathname.startsWith("/ck/")) return u.toString();
+    const enc = u.searchParams.get("u") ?? "";
+    if (!enc.startsWith("a1")) return "";
+    return Buffer.from(enc.slice(2), "base64url").toString("utf8");
+  } catch {
+    return "";
+  }
+}
+
+async function bingSearch(q: string): Promise<WebHit[]> {
+  const { $ } = await fetchPage(`https://www.bing.com/search?q=${encodeURIComponent(q)}&setlang=id&cc=ID&count=30`, "https://www.bing.com/");
+  const items: WebHit[] = [];
+  $("li.b_algo").each((_, r) => {
+    const el = $(r);
+    const a = el.find("h2 a").first();
+    const hit = webHit(clean(a.text()), bingTarget(a.attr("href") ?? ""), clean(el.find(".b_caption p, p.b_lineclamp2, p").first().text()));
+    if (hit) items.push(hit);
+  });
+  return items;
+}
+
+async function ddgSearch(q: string): Promise<WebHit[]> {
+  const { $ } = await fetchPage(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}&kl=id-id`, "https://html.duckduckgo.com/");
+  const items: WebHit[] = [];
+  $(".result").each((_, r) => {
+    const el = $(r);
+    if (el.hasClass("result--ad")) return;
+    const a = el.find("a.result__a").first();
+    let href = a.attr("href") ?? "";
+    const uddg = /[?&]uddg=([^&]+)/.exec(href);
+    if (uddg) href = decodeURIComponent(uddg[1]);
+    if (href.startsWith("//")) href = `https:${href}`;
+    if (/duckduckgo\.com\/y\.js/.test(href)) return;
+    const hit = webHit(clean(a.text()), href, clean(el.find(".result__snippet").text()));
+    if (hit) items.push(hit);
+  });
+  return items;
+}
+
 export const searchEndpoints: Endpoint[] = [
   {
     category: "search", slug: "pinterest", kind: "json",
@@ -238,103 +297,94 @@ export const searchEndpoints: Endpoint[] = [
   {
     category: "search", slug: "mcpedl", kind: "json",
     title: "MCPEDL",
-    description: "Cari addon, map, texture pack, dan skin Minecraft Bedrock di mcpedl.com.",
+    description: "Cari addon, map, texture pack, shader, dan skin Minecraft Bedrock di mcpedl.com.",
     params: [
       { name: "q", required: true, description: "Kata kunci, mis. shader atau one block.", example: "shader" },
-      { name: "page", description: "Nomor halaman hasil. Default 1.", example: "1" },
+      { name: "page", description: "Nomor halaman hasil (20 per halaman). Default 1.", example: "1" },
+      { name: "urut", description: "relevan, populer, terbaru, atau diperbarui. Default relevan.", example: "relevan", options: Object.keys(MCPEDL_SORT) },
     ],
     handler: async ({ sp }) => {
       const q = need(sp, "q", 100);
-      const page = num(sp, "page", 1, 1, 50);
-      const base = "https://mcpedl.com/";
-      const url = page > 1 ? `${base}search/?page=${page}&q=${encodeURIComponent(q)}` : `${base}?s=${encodeURIComponent(q)}`;
-      const { $ } = await fetchPage(url, base);
-      const skip = /^(user|category|tag|search|page|addons?|maps?|texture-packs?|skins?|scripts?|mods?|seeds?|servers?|tools?|submissions?|leaderboard|about|contact|privacy|terms|login|register)$/i;
-      const seen = new Set<string>();
-      const items: Record<string, unknown>[] = [];
-      $("a[href]").each((_, a) => {
-        const el = $(a);
-        const href = absUrl(el.attr("href"), base);
-        if (!href) return;
-        let u: URL;
-        try { u = new URL(href); } catch { return; }
-        if (u.hostname !== "mcpedl.com") return;
-        const parts = u.pathname.split("/").filter(Boolean);
-        if (parts.length !== 1 || skip.test(parts[0])) return;
-        // Kartu hasil = leluhur terdekat yang juga memuat gambar sampul.
-        let card = el;
-        for (let i = 0; i < 6 && !card.find("img").length; i++) card = card.parent();
-        if (!card.find("img").length) return;
-        if (seen.has(parts[0])) return;
-        const title = clean(card.find("h1,h2,h3,h4").first().text()) || clean(el.attr("title")) || clean(el.text());
-        if (!title || title.length < 3) return;
-        seen.add(parts[0]);
-        const img = card.find("img").filter((_, im) => /storage\/submissions|forgecdn|wp-content|media\./i.test($(im).attr("src") ?? $(im).attr("data-src") ?? "")).first();
-        const author = card.find('a[href*="/user/"]').first();
-        const text = clean(card.text());
-        const tags = card
-          .find("a[href]")
-          .map((_, t) => {
-            const p = ($(t).attr("href") ?? "").split("/").filter(Boolean);
-            return p.length >= 2 && !/^(user|https?:)$/i.test(p[0]) && !p[0].includes(".") ? clean($(t).text()) : "";
-          })
-          .get()
-          .filter(Boolean);
-        items.push({
-          slug: parts[0],
-          title,
-          url: href,
-          image: imgSrc(img.length ? img : card.find("img").first(), base),
-          author: clean(author.text()) || null,
-          date: /\b(\d{1,2} [A-Z][a-z]{2},? \d{4})\b/.exec(text)?.[1] ?? null,
-          rating: Number(/(?:^|\s)([0-5]\.\d)(?:\s|$)/.exec(text)?.[1] ?? NaN) || null,
-          tags: [...new Set(tags)].slice(0, 8),
-          description: clean(card.find("p").first().text()) || null,
-        });
-      });
+      const page = num(sp, "page", 1, 1, 500);
+      const sortKey = opt(sp, "urut", "relevan").toLowerCase();
+      const sort = MCPEDL_SORT[sortKey];
+      if (!sort) throw new HttpError(400, `Parameter 'urut' tidak dikenal. Pilihan: ${Object.keys(MCPEDL_SORT).join(", ")}.`);
+      type McItem = {
+        slug?: string; title?: string; summary?: string; image?: string; created_at?: string; updated_at?: string; downloadCount?: number;
+        display_name?: string; user_nicename?: string; user_avatar?: string; average_rating?: string | number; type_id?: number; cf_tags?: { name?: string }[];
+      };
+      const d = await fetchJson<{ meta?: { total?: number; page_count?: number }; results?: McItem[] }>(
+        `https://api.mcpedl.com/api/search/advanced?${new URLSearchParams({ q, page: String(page), sort })}`,
+        { headers: { ...browserHeaders("https://mcpedl.com/"), accept: "application/json, text/plain, */*", origin: "https://mcpedl.com" } },
+        15000,
+      );
+      const items = (d.results ?? [])
+        .filter((r) => r.slug && r.title)
+        .map((r) => ({
+          slug: r.slug,
+          title: clean(r.title),
+          type: MCPEDL_TYPES[r.type_id ?? 0] ?? null,
+          url: `https://mcpedl.com/${r.slug}/`,
+          image: r.image || null,
+          description: clean(r.summary) || null,
+          author: r.display_name ?? null,
+          author_url: r.user_nicename ? `https://mcpedl.com/user/${r.user_nicename}/` : null,
+          author_avatar: r.user_avatar || null,
+          rating: Number(r.average_rating) ? Math.round(Number(r.average_rating) * 10) / 10 : null,
+          downloads: r.downloadCount ?? null,
+          tags: (r.cf_tags ?? []).map((t) => t.name ?? "").filter(Boolean),
+          created_at: r.created_at ?? null,
+          updated_at: r.updated_at ?? null,
+        }));
       if (!items.length) throw new HttpError(404, `Tidak ada hasil MCPEDL untuk '${q}'.`);
-      return { query: q, page, total: items.length, items };
+      return { query: q, page, pages: d.meta?.page_count ?? null, total: d.meta?.total ?? items.length, count: items.length, items };
     },
   },
   {
     category: "search", slug: "cnn", kind: "json",
     title: "CNN Indonesia",
-    description: "Cari berita di CNN Indonesia: judul, kanal, waktu terbit, gambar, dan tautan artikel.",
+    description: "Cari berita di CNN Indonesia: judul, ringkasan, kanal, waktu terbit, gambar, dan tautan artikel.",
     params: [
       { name: "q", required: true, description: "Kata kunci berita.", example: "banjir" },
       { name: "page", description: "Nomor halaman. Default 1.", example: "1" },
-      { name: "urut", description: "terbaru atau relevan. Default terbaru.", example: "terbaru" },
+      { name: "limit", description: "Jumlah berita per halaman, 1 sampai 20. Default 10.", example: "10" },
+      { name: "urut", description: "terbaru atau relevan. Default terbaru.", example: "terbaru", options: ["terbaru", "relevan"] },
     ],
     handler: async ({ sp }) => {
       const q = need(sp, "q", 100);
       const page = num(sp, "page", 1, 1, 50);
+      const limit = num(sp, "limit", 10, 1, 20);
       const latest = opt(sp, "urut", "terbaru").toLowerCase() !== "relevan";
       const base = "https://www.cnnindonesia.com/";
-      const url = `${base}search/?query=${encodeURIComponent(q)}${latest ? "&result_type=latest" : ""}${page > 1 ? `&page=${page}` : ""}`;
-      const { $ } = await fetchPage(url, base);
-      const seen = new Set<string>();
-      const items: Record<string, unknown>[] = [];
-      $("article").each((_, art) => {
-        const el = $(art);
-        const a = el.find('a[href*="cnnindonesia.com"]').first();
-        const href = a.attr("href");
-        const title = clean(el.find("h2,h3").first().text());
-        if (!href || !title || seen.has(href) || !/\/\d{14}-\d+-\d+\//.test(href)) return;
-        seen.add(href);
-        const meta = clean(el.find("span.text-xs, .text-cnn_black_light3, span").last().text());
-        const [channel, time] = meta.split("•").map((s) => clean(s));
-        const stamp = /\/(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})-/.exec(href);
-        items.push({
-          title,
-          url: href,
-          image: imgSrc(el.find("img").first(), base),
-          channel: channel || /cnnindonesia\.com\/([a-z-]+)\//.exec(href)?.[1] || null,
-          time: time || null,
-          published_at: stamp ? `${stamp[1]}-${stamp[2]}-${stamp[3]}T${stamp[4]}:${stamp[5]}:${stamp[6]}+07:00` : null,
-        });
+      type CnnImage = { strnmfile?: string; strposfile?: string; ratio?: string; extension?: string };
+      type CnnItem = { strjudul?: string; strringkasan?: string; url?: string; strnmkanal?: string; strnmkota?: string; dtnewsdate?: string; image?: CnnImage[] };
+      // Halaman pencarian CNN hanya berisi kerangka; datanya diambil dari API ini oleh skrip halaman.
+      const qs = new URLSearchParams({
+        query: q, idtype: "1", typechannel: "", start: String((page - 1) * limit), limit: String(limit),
+        idparentkanal: "", fromdate: "", todate: "", isrelevance: latest ? "0" : "1", pageType: "search",
       });
+      const d = await fetchJson<{ data?: CnnItem[]; total?: number }>(
+        `${base}api/v3/search?${qs}`,
+        { headers: { ...browserHeaders(`${base}search/?query=${encodeURIComponent(q)}`), accept: "application/json" } },
+        15000,
+      );
+      const items = (d.data ?? [])
+        .filter((it) => it.url && it.strjudul)
+        .map((it) => {
+          const img = it.image?.find((i) => i.strposfile === "cover") ?? it.image?.[0];
+          const date = /^(\d{4})\/(\d{2})\/(\d{2}) (\d{2}:\d{2}:\d{2})$/.exec(it.dtnewsdate ?? "");
+          return {
+            title: clean(it.strjudul),
+            url: it.url,
+            summary: clean(it.strringkasan) || null,
+            image: img?.strnmfile ? `https://akcdn.detik.net.id/visual/${img.strnmfile}${img.ratio ?? ""}${img.extension ?? ".jpeg"}?w=650&q=90` : null,
+            channel: clean(it.strnmkanal) || null,
+            city: clean(it.strnmkota) || null,
+            published_at: date ? `${date[1]}-${date[2]}-${date[3]}T${date[4]}+07:00` : null,
+          };
+        });
       if (!items.length) throw new HttpError(404, `Tidak ada berita CNN Indonesia untuk '${q}'.`);
-      return { query: q, page, total: items.length, items };
+      return { query: q, page, total: d.total ?? items.length, count: items.length, items };
     },
   },
   {
@@ -383,48 +433,43 @@ export const searchEndpoints: Endpoint[] = [
     },
   },
   {
-    category: "search", slug: "tiktok", kind: "json",
-    title: "TikTok",
-    description: "Cari video TikTok lengkap dengan tautan video tanpa watermark, audio, statistik, dan pembuatnya.",
+    category: "search", slug: "npm", kind: "json",
+    title: "NPM",
+    description: "Cari paket di registry npm: nama, versi terbaru, deskripsi, jumlah unduhan, dan tautannya.",
     params: [
-      { name: "q", required: true, description: "Kata kunci video.", example: "kucing lucu" },
+      { name: "q", required: true, description: "Kata kunci paket.", example: "baileys" },
       { name: "limit", description: "Jumlah hasil, 1 sampai 20. Default 10.", example: "5" },
     ],
     handler: async ({ sp }) => {
       const q = need(sp, "q", 100);
       const limit = num(sp, "limit", 10, 1, 20);
-      type V = {
-        video_id?: string; region?: string; title?: string; cover?: string; duration?: number; play?: string; wmplay?: string;
-        music?: string; music_info?: { title?: string; author?: string }; play_count?: number; digg_count?: number;
-        comment_count?: number; share_count?: number; create_time?: number; author?: { unique_id?: string; nickname?: string; avatar?: string };
+      type Pkg = {
+        package?: {
+          name?: string; version?: string; description?: string; keywords?: string[]; date?: string; license?: string;
+          links?: { npm?: string; homepage?: string; repository?: string }; publisher?: { username?: string };
+        };
+        downloads?: { weekly?: number; monthly?: number };
       };
-      const d = await fetchJson<{ code?: number; msg?: string; data?: { videos?: V[] } }>(
-        `https://www.tikwm.com/api/feed/search?keywords=${encodeURIComponent(q)}&count=${limit}&cursor=0&hd=1`,
-        { headers: { "user-agent": UA, accept: "application/json" } },
-        15000,
-      );
-      if (d.code !== 0) throw new HttpError(502, `Sumber TikTok menolak permintaan: ${d.msg ?? "tidak diketahui"}.`);
-      const items = (d.data?.videos ?? []).slice(0, limit).map((v) => ({
-        id: v.video_id ?? null,
-        title: clean(v.title),
-        url: v.author?.unique_id && v.video_id ? `https://www.tiktok.com/@${v.author.unique_id}/video/${v.video_id}` : null,
-        cover: v.cover ?? null,
-        duration: v.duration ?? null,
-        video: v.play ?? null,
-        video_watermark: v.wmplay ?? null,
-        audio: v.music ?? null,
-        music_title: v.music_info?.title ?? null,
-        views: v.play_count ?? 0,
-        likes: v.digg_count ?? 0,
-        comments: v.comment_count ?? 0,
-        shares: v.share_count ?? 0,
-        author: v.author?.unique_id ?? null,
-        author_name: v.author?.nickname ?? null,
-        author_avatar: v.author?.avatar ?? null,
-        created_at: v.create_time ? new Date(v.create_time * 1000).toISOString() : null,
-      }));
-      if (!items.length) throw new HttpError(404, `Tidak ada video TikTok untuk '${q}'.`);
-      return { query: q, total: items.length, items };
+      const d = await fetchJson<{ total?: number; objects?: Pkg[] }>(`https://registry.npmjs.org/-/v1/search?text=${encodeURIComponent(q)}&size=${limit}`);
+      const items = (d.objects ?? [])
+        .filter((o) => o.package?.name)
+        .map((o) => ({
+          name: o.package?.name,
+          version: o.package?.version ?? null,
+          description: clean(o.package?.description) || null,
+          keywords: (o.package?.keywords ?? []).slice(0, 10),
+          license: o.package?.license ?? null,
+          publisher: o.package?.publisher?.username ?? null,
+          downloads_weekly: o.downloads?.weekly ?? null,
+          downloads_monthly: o.downloads?.monthly ?? null,
+          updated_at: o.package?.date ?? null,
+          url: o.package?.links?.npm ?? `https://www.npmjs.com/package/${o.package?.name}`,
+          homepage: o.package?.links?.homepage ?? null,
+          repository: o.package?.links?.repository ?? null,
+          install: `npm i ${o.package?.name}`,
+        }));
+      if (!items.length) throw new HttpError(404, `Tidak ada paket npm untuk '${q}'.`);
+      return { query: q, total: d.total ?? items.length, count: items.length, items };
     },
   },
   {
@@ -571,35 +616,32 @@ export const searchEndpoints: Endpoint[] = [
   {
     category: "search", slug: "web", kind: "json",
     title: "Pencarian Web",
-    description: "Hasil pencarian web dari DuckDuckGo: judul, tautan, dan cuplikan. Tanpa pelacakan.",
+    description: "Hasil pencarian web: judul, tautan, dan cuplikan. Memakai Bing, dengan DuckDuckGo sebagai cadangan.",
     params: [
       { name: "q", required: true, description: "Kata kunci pencarian.", example: "cara membuat bot whatsapp" },
       { name: "limit", description: "Jumlah hasil, 1 sampai 20. Default 10.", example: "5" },
     ],
     handler: async ({ sp }) => {
       const q = need(sp, "q", 200);
-      const { $ } = await fetchPage(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}&kl=id-id`, "https://html.duckduckgo.com/");
-      const items: Record<string, unknown>[] = [];
-      $(".result").each((_, r) => {
-        const el = $(r);
-        if (el.hasClass("result--ad")) return;
-        const a = el.find("a.result__a").first();
-        let href = a.attr("href") ?? "";
-        const uddg = /[?&]uddg=([^&]+)/.exec(href);
-        if (uddg) href = decodeURIComponent(uddg[1]);
-        if (href.startsWith("//")) href = `https:${href}`;
-        const title = clean(a.text());
-        if (!title || !/^https?:\/\//.test(href) || /duckduckgo\.com\/y\.js/.test(href)) return;
-        items.push({
-          title: decodeEntities(title),
-          url: href,
-          domain: new URL(href).hostname.replace(/^www\./, ""),
-          snippet: clean(el.find(".result__snippet").text()) || null,
-        });
-      });
-      const out = items.slice(0, num(sp, "limit", 10, 1, 20));
+      const limit = num(sp, "limit", 10, 1, 20);
+      let source = "bing";
+      let items: WebHit[] = [];
+      try {
+        items = await bingSearch(q);
+      } catch {
+        /* lanjut ke cadangan */
+      }
+      if (!items.length) {
+        source = "duckduckgo";
+        try {
+          items = await ddgSearch(q);
+        } catch {
+          /* ditangani di bawah */
+        }
+      }
+      const out = items.slice(0, limit);
       if (!out.length) throw new HttpError(502, "Mesin pencari tidak mengirim hasil. Coba lagi beberapa saat lagi.");
-      return { query: q, total: out.length, items: out };
+      return { query: q, source, total: out.length, items: out };
     },
   },
 ];

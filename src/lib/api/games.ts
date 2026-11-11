@@ -204,14 +204,15 @@ const AKI_ALIAS: Record<string, number> = {
   "4": 4, mungkintidak: 4, probablynot: 4,
 };
 
-type AkiState = { r: string; s: string; g: string; st: number; p: string; c: boolean };
-type AkiStep = { completion?: string; step?: string; question?: string; progression?: string; akitude?: string };
+/** r region, s sesi, st step, p progres, c mode anak, n nomor pertanyaan, lp nomor pertanyaan saat tebakan terakhir. */
+type AkiState = { r: string; s: string; st: number; p: string; c: boolean; n: number; lp: string };
+type AkiStep = { completion?: string; step?: string | number; question?: string; progression?: string | number; akitude?: string };
 type AkiGuess = AkiStep & { id_proposition?: string; id_base_proposition?: string; name_proposition?: string; description_proposition?: string; photo?: string; pseudo?: string };
 
 function akiDecode(token: string): AkiState {
   try {
     const s = JSON.parse(unb64(token)) as AkiState;
-    if (!AKI_REGIONS.includes(s.r) || typeof s.s !== "string" || typeof s.g !== "string" || !Number.isInteger(s.st)) throw new Error("bad");
+    if (!AKI_REGIONS.includes(s.r) || typeof s.s !== "string" || !Number.isInteger(s.st) || !Number.isInteger(s.n)) throw new Error("bad");
     return s;
   } catch {
     throw new HttpError(400, "Parameter 'session' tidak valid. Mulai permainan baru tanpa parameter session.");
@@ -248,7 +249,7 @@ function akiOut(state: AkiState, origin: string, question: string | null, guess:
   const base = `${origin}/api/games/akinator?session=${session}`;
   return {
     session,
-    step: state.st + 1,
+    step: state.n,
     progress: Math.round(Number(state.p) * 100) / 100,
     done: !!guess,
     question,
@@ -258,7 +259,7 @@ function akiOut(state: AkiState, origin: string, question: string | null, guess:
       : null,
     next: guess
       ? { wrong: `${base}&salah=1`, note: "Bila tebakan salah, panggil tautan 'wrong' untuk melanjutkan." }
-      : { answer: `${base}&answer=`, back: state.st > 0 ? `${base}&back=1` : null },
+      : { answer: `${base}&answer=`, back: state.n > 1 ? `${base}&back=1` : null },
   };
 }
 
@@ -295,30 +296,33 @@ export const gamesEndpoints: Endpoint[] = [
         if (!AKI_REGIONS.includes(region)) throw new HttpError(400, `Region tidak dikenal. Pilihan: ${AKI_REGIONS.join(", ")}.`);
         const child = opt(sp, "child") === "true";
         const html = await (await akiPost(region, "game", { sid: "1", cm: String(child) })).text();
-        const question = /<p class="question-text" id="question-label">([\s\S]+?)<\/p>/.exec(html)?.[1];
-        const session = /session: '(.+?)'/.exec(html)?.[1];
-        const signature = /signature: '(.+?)'/.exec(html)?.[1];
-        if (!question || !session || !signature) throw new HttpError(502, "Akinator tidak mengirim sesi permainan. Kemungkinan server ini diblokir oleh Akinator; coba lagi nanti.");
-        return akiOut({ r: region, s: session, g: signature, st: 0, p: "0.00000", c: child }, origin, clean(decodeEntities(question)), null);
+        const question = /id="question-label"[^>]*>([\s\S]*?)<\/p>/.exec(html)?.[1];
+        const item = (key: string) => new RegExp(`localStorage\\.setItem\\('${key}',\\s*'([^']*)'\\)`).exec(html)?.[1];
+        const session = item("session") ?? /session:\s*'([^']+)'/.exec(html)?.[1];
+        if (!question?.trim() || !session) throw new HttpError(502, "Akinator tidak mengirim sesi permainan. Kemungkinan server ini diblokir oleh Akinator; coba lagi nanti.");
+        const first: AkiState = { r: region, s: session, st: Number(item("step")) || 1, p: item("progression") || "0", c: child, n: Number(item("num_question")) || 1, lp: "" };
+        return akiOut(first, origin, clean(decodeEntities(question)), null);
       }
 
       const st = akiDecode(token);
-      const common = { step: String(st.st), progression: st.p, sid: "1", cm: String(st.c), session: st.s, signature: st.g };
+      const common = { step: String(st.st), progression: st.p, sid: "1", cm: String(st.c), session: st.s };
       let path: string;
       let form: Record<string, string>;
+      let move = 1;
       if (opt(sp, "back") === "1") {
-        if (st.st <= 0) throw new HttpError(400, "Belum ada jawaban yang bisa dibatalkan.");
+        if (st.n <= 1) throw new HttpError(400, "Belum ada jawaban yang bisa dibatalkan.");
         path = "cancel_answer";
         form = common;
+        move = -1;
       } else if (opt(sp, "salah") === "1") {
         path = "exclude";
-        form = common;
+        form = { ...common, forward_answer: "1" };
       } else {
         const raw = norm(need(sp, "answer", 30));
         const ans = AKI_ALIAS[raw];
         if (ans === undefined) throw new HttpError(400, "Parameter 'answer' harus 0 (ya), 1 (tidak), 2 (tidak tahu), 3 (mungkin), atau 4 (mungkin tidak).");
         path = "answer";
-        form = { ...common, answer: String(ans), step_last_proposition: "" };
+        form = { ...common, answer: String(ans), step_last_proposition: st.lp, num_question: String(st.n) };
       }
 
       let data: AkiGuess;
@@ -333,9 +337,14 @@ export const gamesEndpoints: Endpoint[] = [
         if (/NO QUESTION/.test(data.completion)) throw new HttpError(404, "Akinator kehabisan pertanyaan. Mulai permainan baru.");
         throw new HttpError(502, `Akinator menolak permintaan (${data.completion}). Mulai permainan baru.`);
       }
-      if (data.id_proposition || data.id_base_proposition || data.name_proposition) return akiOut(st, origin, null, data);
-      if (data.question === undefined || data.step === undefined) throw new HttpError(502, "Akinator mengirim respons yang tidak dikenali.");
-      const next: AkiState = { ...st, st: parseInt(data.step, 10), p: data.progression ?? st.p };
+      const step = data.step === undefined ? st.st : Number(data.step);
+      const prog = data.progression === undefined ? st.p : String(data.progression);
+      if (data.id_proposition || data.id_base_proposition || data.name_proposition) {
+        // Tebakan: simpan posisi terakhir supaya 'salah=1' bisa melanjutkan dari sini.
+        return akiOut({ ...st, st: Number.isFinite(step) ? step : st.st, p: prog, lp: String(st.n) }, origin, null, data);
+      }
+      if (data.question === undefined || !Number.isFinite(step)) throw new HttpError(502, "Akinator mengirim respons yang tidak dikenali.");
+      const next: AkiState = { ...st, st: step, p: prog, n: Math.max(1, st.n + move) };
       return akiOut(next, origin, clean(decodeEntities(data.question)), null);
     },
   },

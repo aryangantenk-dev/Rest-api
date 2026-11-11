@@ -50,7 +50,23 @@ export async function GET(req: Request, ctx: { params: Promise<{ action: string 
       const postBody = sp.get("body");
       const r = await fetch(target, { method: postBody === null ? "GET" : "POST", body: postBody ?? undefined, headers, redirect: "follow", cache: "no-store", signal: AbortSignal.timeout(20000) });
       const isText = /text|json|xml|javascript/.test(r.headers.get("content-type") || "");
-      const text = isText ? await r.text() : "";
+      const raw = Buffer.from(await r.arrayBuffer());
+      const text = isText ? raw.toString("utf8") : "";
+      if (!isText) {
+        let dim: number[] | null = null;
+        if (raw.length > 24 && raw.readUInt32BE(0) === 0x89504e47) dim = [raw.readUInt32BE(16), raw.readUInt32BE(20)];
+        else if (raw.length > 10 && raw.toString("ascii", 0, 3) === "GIF") dim = [raw.readUInt16LE(6), raw.readUInt16LE(8)];
+        else if (raw[0] === 0xff && raw[1] === 0xd8) {
+          for (let i = 2; i + 9 < raw.length; ) {
+            if (raw[i] !== 0xff) { i++; continue; }
+            const m = raw[i + 1];
+            if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) { dim = [raw.readUInt16BE(i + 7), raw.readUInt16BE(i + 5)]; break; }
+            i += 2 + raw.readUInt16BE(i + 2);
+          }
+        }
+        const b64 = sp.get("b64") && raw.length < 60000 ? raw.toString("base64") : undefined;
+        return json(200, { result: { status: r.status, final: r.url, type: r.headers.get("content-type"), bytes: raw.length, dim, b64 } });
+      }
       const off = Number(sp.get("off") || 0);
       const len = Math.min(Number(sp.get("len") || 3000), 20000);
       const find = sp.get("find");

@@ -156,16 +156,37 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
                           )}
                         </label>
                         <p className="mt-1 text-xs text-muted">{p.description}</p>
-                        <input
-                          id={`${id}-${p.name}`}
-                          value={values[p.name] ?? ""}
-                          onChange={(ev) => setValues((v) => ({ ...v, [p.name]: ev.target.value }))}
-                          onKeyDown={(ev) => ev.key === "Enter" && missing.length === 0 && send()}
-                          spellCheck={false}
-                          autoComplete="off"
-                          placeholder={p.example || p.name}
-                          className="mt-2 w-full rounded-xl border border-line bg-bg px-3.5 py-2.5 font-mono text-base text-fg outline-none transition-colors placeholder:text-dim focus:border-ember/60 sm:text-[13px]"
-                        />
+                        {p.options ? (
+                          <div id={`${id}-${p.name}`} role="group" aria-label={p.name} className="mt-2 flex flex-wrap gap-2">
+                            {p.options.map((o) => {
+                              const active = (values[p.name] ?? "") === o;
+                              return (
+                                <button
+                                  key={o}
+                                  type="button"
+                                  aria-pressed={active}
+                                  onClick={() => setValues((v) => ({ ...v, [p.name]: active && !p.required ? "" : o }))}
+                                  className={`rounded-xl border px-3.5 py-2 font-mono text-[13px] transition-colors ${
+                                    active ? "border-ember/60 bg-ember/15 text-fg" : "border-line bg-bg text-muted hover:border-ember/40 hover:text-fg"
+                                  }`}
+                                >
+                                  {o}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <input
+                            id={`${id}-${p.name}`}
+                            value={values[p.name] ?? ""}
+                            onChange={(ev) => setValues((v) => ({ ...v, [p.name]: ev.target.value }))}
+                            onKeyDown={(ev) => ev.key === "Enter" && missing.length === 0 && send()}
+                            spellCheck={false}
+                            autoComplete="off"
+                            placeholder={p.example || p.name}
+                            className="mt-2 w-full rounded-xl border border-line bg-bg px-3.5 py-2.5 font-mono text-base text-fg outline-none transition-colors placeholder:text-dim focus:border-ember/60 sm:text-[13px]"
+                          />
+                        )}
                       </div>
                     ))}
                   </div>

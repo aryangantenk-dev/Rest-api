@@ -140,6 +140,17 @@ function shortCode(len = 6) {
   return Array.from(bytes, (b) => BASE62[b % BASE62.length]).join("");
 }
 
+/** Ukuran viewport [lebar, tinggi] untuk tiap perangkat screenshot. */
+const SHOT_DEVICES: Record<string, [number, number]> = {
+  desktop: [1920, 1080],
+  laptop: [1366, 768],
+  tablet: [820, 1180],
+  mobile: [390, 844],
+};
+const SHOT_ALIAS: Record<string, string> = {
+  pc: "desktop", komputer: "desktop", hp: "mobile", ponsel: "mobile", phone: "mobile", android: "mobile", iphone: "mobile", ipad: "tablet", tab: "tablet",
+};
+
 export const toolsEndpoints: Endpoint[] = [
   {
     category: "tools", slug: "qrcode", kind: "image",
@@ -165,15 +176,32 @@ export const toolsEndpoints: Endpoint[] = [
   {
     category: "tools", slug: "screenshot", kind: "image",
     title: "Screenshot Website",
-    description: "Ambil tangkapan layar halaman web dan terima hasilnya sebagai gambar.",
+    description: "Ambil tangkapan layar halaman web seperti tampil di perangkat pilihan: desktop, laptop, tablet, atau mobile (HP). Hasilnya langsung berupa gambar.",
     params: [
       { name: "url", required: true, description: "Alamat website.", example: "https://nextjs.org" },
-      { name: "width", description: "Lebar viewport (320–1920).", example: "1280" },
+      {
+        name: "device",
+        description: "Perangkat: desktop (1920x1080), laptop (1366x768), tablet (820x1180), atau mobile (390x844). Default desktop.",
+        example: "desktop",
+        options: Object.keys(SHOT_DEVICES),
+      },
     ],
     handler: async ({ sp }) => {
       const u = parseHttpUrl(need(sp, "url", 500));
-      const w = Math.round(num(sp, "width", 1280, 320, 1920));
-      const res = await fetchRaw(`https://image.thum.io/get/width/${w}/crop/${Math.round(w * 0.5625)}/noanimate/${u.toString()}`, undefined, 30000);
+      const raw = opt(sp, "device").toLowerCase().replace(/[^a-z]/g, "");
+      let vw: number;
+      let vh: number;
+      if (!raw && opt(sp, "width")) {
+        // Parameter lama: tetap dilayani supaya pemanggil lama tidak rusak.
+        vw = Math.round(num(sp, "width", 1280, 320, 1920));
+        vh = Math.round(vw * 0.5625);
+      } else {
+        const name = SHOT_ALIAS[raw] ?? (raw || "desktop");
+        const dev = SHOT_DEVICES[name];
+        if (!dev) throw new HttpError(400, `Parameter 'device' tidak dikenal. Pilihan: ${Object.keys(SHOT_DEVICES).join(", ")}.`);
+        [vw, vh] = dev;
+      }
+      const res = await fetchRaw(`https://image.thum.io/get/viewportWidth/${vw}/width/${vw}/crop/${vh}/noanimate/${u.toString()}`, undefined, 30000);
       const buf = await res.arrayBuffer();
       return binaryResponse(buf, res.headers.get("content-type") ?? "image/png", "public, max-age=600");
     },
