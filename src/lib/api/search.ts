@@ -628,7 +628,7 @@ export const searchEndpoints: Endpoint[] = [
           { headers: browserHeaders(`${site}/`, { accept: "application/json, text/javascript, */*; q=0.01", "x-requested-with": "XMLHttpRequest" }) },
         );
       } catch (e) {
-        if (e instanceof HttpError && e.status === 502) throw new HttpError(502, "Pencarian LK21 sedang menolak permintaan dari server ini. Coba lagi beberapa saat lagi.");
+        if (e instanceof HttpError && e.status === 502 && /status (403|429|503)/.test(e.message)) throw new HttpError(502, "Pencarian LK21 sedang menolak permintaan dari server ini. Coba lagi beberapa saat lagi.");
         throw e;
       }
       const n = (v: unknown) => (v === "" || v === null || v === undefined || !Number.isFinite(Number(v)) ? null : Number(v));
