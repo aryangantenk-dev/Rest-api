@@ -53,7 +53,11 @@ export async function GET(req: Request, ctx: { params: Promise<{ action: string 
           // Langsung dari Vercel (tanpa proxy), untuk host player.
           const h: Record<string, string> = { "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36", accept: sp.get("accept") || "text/html,application/xhtml+xml,*/*;q=0.8" };
           if (sp.get("referer")) h.referer = sp.get("referer") as string;
-          const fr = await fetch(sp.get("url") || "", { headers: h, redirect: "follow", cache: "no-store", signal: AbortSignal.timeout(20000) });
+          if (sp.get("xhr")) h["x-requested-with"] = "XMLHttpRequest";
+          if (sp.get("origin")) h.origin = sp.get("origin") as string;
+          const post = sp.get("post");
+          if (post) h["content-type"] = "application/x-www-form-urlencoded";
+          const fr = await fetch(sp.get("url") || "", { method: post ? "POST" : "GET", body: post || undefined, headers: h, redirect: "follow", cache: "no-store", signal: AbortSignal.timeout(20000) });
           r = { status: fr.status, finalUrl: fr.url, type: `${fr.headers.get("content-type") || ""} | xfo=${fr.headers.get("x-frame-options") || "-"} | csp=${(fr.headers.get("content-security-policy") || "-").slice(0, 200)}`, text: await fr.text() };
         } else
         r = await viaProxy(sp.get("url") || "", { accept: sp.get("accept") || undefined, referer: sp.get("referer") || undefined, origin: !!sp.get("origin"), xhr: !!sp.get("xhr") });
