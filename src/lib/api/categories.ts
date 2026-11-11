@@ -103,8 +103,8 @@ export const categories: Category[] = [
   {
     id: "film",
     name: "Film",
-    tagline: "LK21 & pemeran",
-    description: "Scraper film LK21 (Layarkaca21): beranda, daftar film, genre, detail film dan serial, daftar pemeran, serta film per pemeran. Berjalan lewat server perantara (VPS) milik pemilik API.",
+    tagline: "LK21, pemeran & player",
+    description: "Scraper film LK21 (Layarkaca21): beranda, daftar film, genre, detail film dan serial, daftar pemeran, film per pemeran, serta player video film dan episode serial. Berjalan lewat server perantara (VPS) milik pemilik API.",
     seoTitle: "REST API Film: Scraper LK21, Detail Film & Daftar Pemeran",
   },
 ];

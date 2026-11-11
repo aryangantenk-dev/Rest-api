@@ -1,6 +1,6 @@
 # Yanxz API
 
-REST API gratis tanpa API key (137 endpoint) beserta dokumentasi dan playground interaktif. Dibangun dengan Next.js 16 (App Router).
+REST API gratis tanpa API key (139 endpoint) beserta dokumentasi dan playground interaktif. Dibangun dengan Next.js 16 (App Router).
 
 ## Menjalankan lokal
 
@@ -131,9 +131,22 @@ Kedua scraper membaca HTML situs sumber, jadi bisa berhenti bekerja kalau situs 
 | `/api/film/lk21-detail?slug=…` | Detail film atau serial: sinopsis, rating, genre, negara, sutradara, pemeran, trailer, film terkait, dan daftar episode untuk serial. |
 | `/api/film/lk21-pemeran?slug=…` | Daftar pemeran dan sutradara sebuah judul, lengkap dengan tautan ke daftar film tiap orang. |
 | `/api/film/lk21-artis?slug=…&peran=&page=` | Semua film seorang pemeran (`peran=artis`) atau sutradara (`peran=sutradara`). |
+| `/api/film/lk21-player?slug=…&season=&episode=` | Server player video sebuah film atau episode serial: alamat player untuk `<iframe>`, tanda bisa/tidaknya dipasang di situs lain, link unduhan, dan navigasi episode. |
+| `/api/film/lk21-embed?slug=…&season=&episode=&server=` | Halaman HTML berisi player, untuk dipakai langsung sebagai `src` iframe. |
 | `/api/search/lk21?q=…&page=&tipe=` | Cari judul di LK21 (`tipe`: `movie` atau `series`). Tidak butuh server perantara. |
 
-LK21 menolak IP server Vercel, jadi enam endpoint `/api/film/*` dititipkan lewat server perantara ("film-proxy") di VPS milik sendiri:
+Contoh memasang player film dan episode serial:
+
+```html
+<iframe src="https://domainmu/api/film/lk21-embed?slug=avatar-2009"
+        width="100%" style="aspect-ratio:16/9;border:0" allowfullscreen></iframe>
+<iframe src="https://domainmu/api/film/lk21-embed?slug=avatar-seven-havens-2026&season=1&episode=3"
+        width="100%" style="aspect-ratio:16/9;border:0" allowfullscreen></iframe>
+```
+
+Tidak semua server bisa dipakai di luar LK21: server `p2p` hanya mau diputar di dalam situs LK21 (ditandai `embeddable: false`), jadi embed otomatis memilih server lain seperti `cast` atau `hydrax`. Player berasal dari pihak ketiga dan bisa memuat iklan.
+
+LK21 menolak IP server Vercel, jadi endpoint `/api/film/*` dititipkan lewat server perantara ("film-proxy") di VPS milik sendiri:
 
 1. Di VPS Ubuntu, jalankan `scripts/film-proxy/install.sh` sebagai root (tambahkan `TUNNEL=1` bila port VPS tidak bisa dijangkau dari luar). Skrip mengetes dulu apakah IP VPS diterima, lalu memasang layanan `film-proxy` dan mencetak `PROXY_URL` serta `PROXY_KEY`.
 2. Isi env `FILM_PROXY_URL` dan `FILM_PROXY_KEY` di hosting dengan dua nilai itu, lalu deploy ulang.
