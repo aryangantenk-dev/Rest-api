@@ -2,8 +2,9 @@ import Link from "next/link";
 import { categories, categoryById } from "@/lib/api/categories";
 import { allMeta } from "@/lib/api/registry";
 import type { CategoryId } from "@/lib/api/types";
-import { SITE_URL } from "@/lib/site";
+import { SITE_NAME, SITE_URL } from "@/lib/site";
 import { RATE_LIMIT } from "@/lib/limits";
+import { CategorySelect } from "./category-select";
 import { BaseUrlBox } from "./client-utils";
 import { DocsExplorer } from "./docs-explorer";
 import { CategoryIcon } from "./icons";
@@ -20,101 +21,93 @@ export function DocsShell({ active }: { active?: CategoryId }) {
   const list = active ? all.filter((e) => e.category === active) : all;
   const cats = active ? categories.filter((c) => c.id === active) : categories;
   const current = active ? categoryById[active] : null;
+  const count = (id: CategoryId) => all.filter((e) => e.category === id).length;
+
+  const navItem = (on: boolean) =>
+    `relative flex min-h-10 items-center gap-3 px-3 text-[0.9375rem] transition-colors duration-150 ${on ? "bg-subtle font-semibold text-fg" : "text-muted hover:bg-subtle hover:text-fg"}`;
 
   return (
-    <div className="mx-auto max-w-7xl px-5 pb-10 pt-24 sm:px-8 sm:pt-32 lg:pt-36">
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[250px_minmax(0,1fr)] lg:gap-14">
-        {/* sidebar */}
-        <aside className="min-w-0 lg:sticky lg:top-24 lg:self-start">
-          <nav aria-label="Kategori dokumentasi">
-            <p className="mb-4 hidden font-mono text-[11px] uppercase tracking-[0.16em] text-dim lg:block">Kategori</p>
-            <ul className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5 pb-2 sm:-mx-8 sm:px-8 lg:mx-0 lg:flex-col lg:gap-1 lg:overflow-visible lg:px-0 lg:pb-0">
-              <li className="shrink-0">
-                <Link
-                  href="/docs"
-                  className={`flex items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-sm transition-colors lg:border-transparent ${
-                    !active ? "border-linestrong bg-white/[0.05] text-fg" : "border-line text-muted hover:bg-white/[0.03] hover:text-fg"
-                  }`}
-                >
-                  <span>Semua endpoint</span>
-                  <span className="font-mono text-[11px] text-dim">{all.length}</span>
+    <div className="mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6 lg:pt-12">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-12">
+        {/* navigasi kategori: daftar di layar lebar, pemilih bawaan di layar kecil */}
+        <aside className="min-w-0 lg:sticky lg:top-[calc(var(--header-h)+1.5rem)] lg:max-h-[calc(100dvh-var(--header-h)-3rem)] lg:self-start lg:overflow-y-auto">
+          <CategorySelect
+            value={active ? `/docs/${active}` : "/docs"}
+            options={[{ value: "/docs", label: `Semua endpoint (${all.length})` }, ...categories.map((c) => ({ value: `/docs/${c.id}`, label: `${c.name} (${count(c.id)})` }))]}
+          />
+          <nav aria-label="Kategori dokumentasi" className="hidden lg:block">
+            <h2 className="px-3 text-sm font-semibold">Kategori</h2>
+            <ul className="mt-2">
+              <li>
+                <Link href="/docs" aria-current={!active ? "page" : undefined} className={navItem(!active)}>
+                  {!active && <span className="absolute inset-y-0 left-0 w-0.5 bg-accent" aria-hidden />}
+                  <span className="flex-1">Semua endpoint</span>
+                  <span className="tnum font-mono text-sm font-normal text-muted">{all.length}</span>
                 </Link>
               </li>
               {categories.map((c) => {
                 const on = active === c.id;
                 return (
-                  <li key={c.id} className="shrink-0">
-                    <Link
-                      href={`/docs/${c.id}`}
-                      className={`flex items-center gap-3 rounded-xl border px-3.5 py-2.5 text-sm transition-colors lg:border-transparent ${
-                        on ? "border-linestrong bg-white/[0.05] text-fg" : "border-line text-muted hover:bg-white/[0.03] hover:text-fg"
-                      }`}
-                    >
-                      <CategoryIcon id={c.id} className={`h-[18px] w-[18px] ${on ? "text-ember" : "text-dim"}`} />
-                      <span>{c.name}</span>
-                      <span className="ml-auto font-mono text-[11px] text-dim">{all.filter((e) => e.category === c.id).length}</span>
+                  <li key={c.id}>
+                    <Link href={`/docs/${c.id}`} aria-current={on ? "page" : undefined} className={navItem(on)}>
+                      {on && <span className="absolute inset-y-0 left-0 w-0.5 bg-accent" aria-hidden />}
+                      <CategoryIcon id={c.id} className="h-5 w-5 shrink-0" />
+                      <span className="flex-1">{c.name}</span>
+                      <span className="tnum font-mono text-sm font-normal text-muted">{count(c.id)}</span>
                     </Link>
                   </li>
                 );
               })}
             </ul>
           </nav>
-
-          <dl className="mt-8 hidden space-y-3 rounded-2xl border border-line p-5 text-sm lg:block">
-            {facts.map(([k, v]) => (
-              <div key={k} className="flex justify-between">
-                <dt className="text-dim">{k}</dt>
-                <dd className="font-mono text-xs text-fg">{v}</dd>
-              </div>
-            ))}
-          </dl>
         </aside>
 
         {/* konten */}
         <div className="min-w-0">
-          <header className="fade-up">
-            <nav aria-label="Breadcrumb" className="mb-5 flex items-center gap-2 font-mono text-xs text-dim">
-              <Link href="/" className="hover:text-fg">Beranda</Link>
-              <span>/</span>
-              <Link href="/docs" className={active ? "hover:text-fg" : "text-muted"}>Docs</Link>
-              {current && (
-                <>
-                  <span>/</span>
-                  <span className="text-muted">{current.name}</span>
-                </>
-              )}
+          <header>
+            <nav aria-label="Breadcrumb">
+              <ol className="flex flex-wrap items-center gap-2 text-sm text-muted">
+                <li>
+                  <Link href="/" className="link">Beranda</Link>
+                </li>
+                <li aria-hidden>/</li>
+                <li>
+                  {current ? (
+                    <Link href="/docs" className="link">Dokumentasi</Link>
+                  ) : (
+                    <span aria-current="page" className="text-fg">Dokumentasi</span>
+                  )}
+                </li>
+                {current && (
+                  <>
+                    <li aria-hidden>/</li>
+                    <li>
+                      <span aria-current="page" className="text-fg">{current.name}</span>
+                    </li>
+                  </>
+                )}
+              </ol>
             </nav>
-            <h1 className="font-display text-[2.1rem] font-semibold leading-[1.05] tracking-[-0.03em] min-[400px]:text-4xl sm:text-5xl">
-              {current ? (
-                <>
-                  API <span className="font-serif font-normal italic text-ember-gradient">{current.name}</span>
-                </>
-              ) : (
-                <>
-                  Dokumentasi <span className="font-serif font-normal italic text-ember-gradient">API</span>
-                </>
-              )}
-            </h1>
-            <p className="mt-5 max-w-2xl text-base leading-relaxed text-muted sm:text-lg">
+            <h1 className="mt-4 font-mono text-[2rem] font-bold leading-tight tracking-tight sm:text-[2.5rem]">{current ? `API ${current.name}` : "Dokumentasi API"}</h1>
+            <p className="mt-4 max-w-[65ch] text-lg text-muted">
               {current
                 ? current.description
-                : "Jelajahi seluruh endpoint Yanxz API. Buka salah satu kartu untuk mencoba permintaan langsung dari browser dan menyalin kode siap pakai."}
+                : `Semua endpoint ${SITE_NAME} ada di halaman ini. Buka satu endpoint untuk mengisi parameter, mengirim permintaan dari browser, dan menyalin contoh kodenya.`}
             </p>
-            <div className="mt-7">
+            <div className="mt-6">
               <BaseUrlBox fallback={SITE_URL} />
             </div>
-            {/* ringkasan cepat untuk HP & tablet (di desktop tampil di sidebar) */}
-            <dl className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line sm:grid-cols-4 lg:hidden">
+            <dl className="mt-6 grid grid-cols-2 gap-x-6 gap-y-4 border-y border-line py-4 sm:grid-cols-4">
               {facts.map(([k, v]) => (
-                <div key={k} className="bg-bg px-4 py-3">
-                  <dt className="text-xs text-dim">{k}</dt>
-                  <dd className="mt-1 font-mono text-xs text-fg">{v}</dd>
+                <div key={k}>
+                  <dt className="text-sm text-muted">{k}</dt>
+                  <dd className="tnum mt-0.5 font-mono text-sm font-bold">{v}</dd>
                 </div>
               ))}
             </dl>
           </header>
 
-          <div className="mt-10">
+          <div className="mt-6">
             <DocsExplorer endpoints={list} categories={cats} fallback={SITE_URL} showGroupHeadings={!active} />
           </div>
         </div>

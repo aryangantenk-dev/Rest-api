@@ -1,4 +1,4 @@
-# Yanxz API
+# yanz.api
 
 REST API gratis tanpa API key (150 endpoint) beserta dokumentasi dan playground interaktif. Dibangun dengan Next.js 16 (App Router).
 
@@ -85,7 +85,7 @@ Akinator dan Tic Tac Toe juga tanpa sesi: simpan nilai `session` (Akinator) atau
 
 | Endpoint | Keterangan |
 | --- | --- |
-| `/api/tools/shorturl?url=…` | Bawaan Yanxz API. Tautan pendek di domain sendiri (`/s/<kode>`) dengan hitungan klik. Butuh database. |
+| `/api/tools/shorturl?url=…` | Bawaan yanz.api. Tautan pendek di domain sendiri (`/s/<kode>`) dengan hitungan klik. Butuh database. |
 | `/api/tools/tinyurl?url=…&alias=…` | Lewat TinyURL (`tinyurl.com`). Tanpa database, `alias` opsional. |
 
 ## Scraper Komik (komiku.org)

@@ -64,7 +64,7 @@ async function loadImage(raw: string, maxBytes = 3_000_000): Promise<string> {
   const u = parseHttpUrl(raw);
   const res = await fetchRaw(
     u.toString(),
-    { headers: { accept: "image/png,image/jpeg,image/gif,image/*;q=0.8", "user-agent": "Mozilla/5.0 (compatible; YanxzAPI/1.0)" } },
+    { headers: { accept: "image/png,image/jpeg,image/gif,image/*;q=0.8", "user-agent": "Mozilla/5.0 (compatible; YanzAPI/1.0)" } },
     10000,
   );
   const type = (res.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
@@ -199,8 +199,8 @@ async function greetingCard(sp: URLSearchParams, kind: "welcome" | "goodbye") {
 }
 
 const greetingParams = (kind: "welcome" | "goodbye") => [
-  { name: "name", required: true, description: "Nama member.", example: "Yanxz" },
-  { name: "group", description: "Nama grup.", example: "Yanxz Community" },
+  { name: "name", required: true, description: "Nama member.", example: "Yanz" },
+  { name: "group", description: "Nama grup.", example: "Komunitas Yanz" },
   { name: "count", description: kind === "welcome" ? "Urutan member (angka)." : "Sisa jumlah member (angka).", example: "128" },
   { name: "avatar", description: "URL foto profil (JPG/PNG). Kosongkan untuk avatar inisial.", example: "" },
   { name: "background", description: "URL gambar latar (opsional).", example: "" },
@@ -387,7 +387,7 @@ export const canvasEndpoints: Endpoint[] = [
     description: "Kartu \"sedang diputar\" bergaya jendela Windows Media Player klasik: sampul, judul, artis, dan bilah durasi.",
     params: [
       { name: "title", required: true, description: "Judul lagu.", example: "Lagu Favoritku" },
-      { name: "artist", description: "Nama artis.", example: "Yanxz" },
+      { name: "artist", description: "Nama artis.", example: "Yanz" },
       { name: "image", description: "URL sampul album (JPG/PNG). Opsional.", example: "" },
       { name: "current", description: "Posisi putar (m:ss). Default 1:12.", example: "1:12" },
       { name: "duration", description: "Durasi total (m:ss). Default 3:45.", example: "3:45" },
@@ -592,7 +592,7 @@ export const canvasEndpoints: Endpoint[] = [
     description: "Gelembung chat dengan foto profil dan nama, latar transparan 512×512. Cocok dijadikan stiker.",
     params: [
       { name: "text", required: true, description: "Isi pesan (maks 300 karakter).", example: "Hidup itu seperti kode, kadang error tanpa alasan." },
-      { name: "name", description: "Nama pengirim.", example: "Yanxz" },
+      { name: "name", description: "Nama pengirim.", example: "Yanz" },
       { name: "avatar", description: "URL foto profil (JPG/PNG). Opsional.", example: "" },
       { name: "color", description: "Warna nama (hex). Default otomatis.", example: "" },
     ],
@@ -636,7 +636,7 @@ export const canvasEndpoints: Endpoint[] = [
     title: "Rank Card",
     description: "Kartu level/XP untuk sistem leveling bot: foto profil, level, peringkat, dan progres XP.",
     params: [
-      { name: "name", required: true, description: "Nama pengguna.", example: "Yanxz" },
+      { name: "name", required: true, description: "Nama pengguna.", example: "Yanz" },
       { name: "level", description: "Level saat ini.", example: "12" },
       { name: "rank", description: "Peringkat.", example: "3" },
       { name: "xp", description: "XP saat ini.", example: "740" },

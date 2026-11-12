@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { findEndpoint } from "@/lib/api/registry";
 import { HttpError } from "@/lib/api/types";
-import { getOrigin } from "@/lib/site";
+import { SITE_CREATOR, getOrigin } from "@/lib/site";
 import { recordHit } from "@/lib/stats";
 import { APPEAL_URL, OWNER_WA, RATE_LIMIT, clientIp, guard } from "@/lib/guard";
 
@@ -16,7 +16,7 @@ const CORS = {
 };
 
 function fail(status: number, error: string, extra: Record<string, string> = {}, more: Record<string, unknown> = {}) {
-  return NextResponse.json({ status: false, code: status, creator: "Yanxz", error, ...more }, { status, headers: { ...CORS, ...extra } });
+  return NextResponse.json({ status: false, code: status, creator: SITE_CREATOR, error, ...more }, { status, headers: { ...CORS, ...extra } });
 }
 
 export async function OPTIONS() {
@@ -60,7 +60,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ path: string[] 
       for (const [k, v] of Object.entries({ ...CORS, ...rlHeaders })) result.headers.set(k, v);
       return result;
     }
-    return new NextResponse(JSON.stringify({ status: true, creator: "Yanxz", result }, null, 2), {
+    return new NextResponse(JSON.stringify({ status: true, creator: SITE_CREATOR, result }, null, 2), {
       headers: { "content-type": "application/json; charset=utf-8", ...CORS, ...rlHeaders },
     });
   } catch (e) {

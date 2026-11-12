@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { adminBan, adminListBans, adminUnban } from "@/lib/guard";
+import { SITE_CREATOR } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -13,7 +14,7 @@ export const runtime = "nodejs";
  * Kunci juga boleh dikirim lewat header `x-admin-key`.
  */
 const json = (status: number, body: Record<string, unknown>) =>
-  NextResponse.json({ status: status < 400, code: status, creator: "Yanxz", ...body }, { status, headers: { "cache-control": "no-store" } });
+  NextResponse.json({ status: status < 400, code: status, creator: SITE_CREATOR, ...body }, { status, headers: { "cache-control": "no-store" } });
 
 function authorized(given: string) {
   const key = (process.env.ADMIN_KEY || "").trim();

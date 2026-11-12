@@ -4,7 +4,7 @@ import { DocsShell } from "@/components/docs-shell";
 import { categories, categoryById } from "@/lib/api/categories";
 import { allMeta } from "@/lib/api/registry";
 import type { CategoryId } from "@/lib/api/types";
-import { SITE_URL } from "@/lib/site";
+import { SITE_NAME, SITE_URL } from "@/lib/site";
 
 export const dynamicParams = false;
 
@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: { params: Promise<{ category:
     title: c.seoTitle,
     description: `${c.description} ${count} endpoint, gratis tanpa API key, lengkap dengan playground dan contoh kode.`,
     alternates: { canonical: `/docs/${c.id}` },
-    openGraph: { url: `/docs/${c.id}`, title: `${c.seoTitle} | Yanxz API`, description: c.description },
+    openGraph: { url: `/docs/${c.id}`, title: `${c.seoTitle} | ${SITE_NAME}`, description: c.description },
   };
 }
 

@@ -101,7 +101,7 @@ export async function twitter(url: URL) {
     text?: string; created_at?: string; likes?: number; retweets?: number; replies?: number; views?: number | null; url?: string;
     author?: { name?: string; screen_name?: string; avatar_url?: string }; media?: { all?: M[] };
   };
-  const d = await fetchJson<{ code?: number; message?: string; tweet?: T | null }>(`https://api.fxtwitter.com/i/status/${id}`, { headers: { "user-agent": "YanxzAPI/1.0", accept: "application/json" } }, 15000);
+  const d = await fetchJson<{ code?: number; message?: string; tweet?: T | null }>(`https://api.fxtwitter.com/i/status/${id}`, { headers: { "user-agent": "YanzAPI/1.0", accept: "application/json" } }, 15000);
   if (!d.tweet) throw new HttpError(404, "Tweet tidak ditemukan, dihapus, atau akunnya privat.");
   const t = d.tweet;
   const media: Media[] = [];

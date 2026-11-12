@@ -1,43 +1,69 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import type { CSSProperties } from "react";
 import { BaseUrlBox, LiveRequests } from "@/components/client-utils";
 import { CodeTabs } from "@/components/code-tabs";
-import { HeroTerminal } from "@/components/hero-terminal";
-import { ArrowIcon, CategoryIcon } from "@/components/icons";
-import { CountUp, Reveal, SpotlightCard } from "@/components/motion";
+import { ArrowIcon, CategoryIcon, ChevronIcon, ExternalIcon } from "@/components/icons";
+import { Stagger } from "@/components/motion";
+import { TryConsole, type ConsoleEndpoint } from "@/components/try-console";
 import { categories } from "@/lib/api/categories";
 import { allMeta } from "@/lib/api/registry";
-import { SITE_NAME, SITE_URL } from "@/lib/site";
+import { APPEAL_URL } from "@/lib/guard";
+import { colorizeJson } from "@/lib/highlight";
+import { RATE_LIMIT } from "@/lib/limits";
+import { SITE_CREATOR, SITE_NAME, SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
 };
 
-const headline = ["REST", "API", "gratis", "untuk", "segala", "kebutuhan", "developer."];
+const steps = [
+  { t: "Pilih endpoint", d: "Cari fitur yang kamu butuhkan di dokumentasi, lalu lihat parameter yang diperlukan." },
+  { t: "Kirim permintaan GET", d: "Tempel base URL, tambahkan path dan query string. Tidak ada header khusus atau autentikasi." },
+  { t: "Terima hasilnya", d: "Ambil field result dari JSON, atau langsung tampilkan gambarnya di tag <img>." },
+];
 
 const features = [
-  { t: "Tanpa API key", d: "Tidak ada pendaftaran, token, atau kuota yang membingungkan. Salin URL-nya, langsung jalan." },
+  { t: "Tanpa API key", d: "Tidak ada pendaftaran, token, atau kuota tersembunyi. Salin URL-nya, langsung jalan." },
   { t: "CORS terbuka", d: "Panggil dari browser, aplikasi mobile, bot WhatsApp atau Telegram, bahkan dari file HTML lokal." },
-  { t: "Format respons seragam", d: "Setiap endpoint JSON mengembalikan status, creator, dan result sehingga parser-mu cukup ditulis sekali." },
-  { t: "Playground interaktif", d: "Setiap endpoint punya form uji coba dan contoh kode siap salin di cURL, JavaScript, Python, dan PHP." },
-  { t: "Gambar dibuat langsung", d: "QR Code, avatar, dan placeholder dirender sebagai PNG saat diminta, tanpa penyimpanan file." },
-  { t: "Pesan error yang jelas", d: "Parameter salah? Kamu akan mendapat kode HTTP yang tepat beserta penjelasan dalam bahasa Indonesia." },
+  { t: "Format respons seragam", d: "Setiap endpoint JSON mengembalikan status, creator, dan result, jadi parser cukup ditulis sekali." },
+  { t: "Playground di setiap endpoint", d: "Ada form uji coba dan contoh kode siap salin untuk cURL, JavaScript, Python, dan PHP." },
+  { t: "Gambar dibuat saat diminta", d: "QR Code, avatar, kartu canvas, dan placeholder dirender sebagai PNG tanpa penyimpanan file." },
+  { t: "Pesan error yang jelas", d: "Parameter salah? Kamu mendapat kode HTTP yang tepat beserta penjelasan dalam bahasa Indonesia." },
 ];
 
 const faqs = [
-  { q: "Apakah Yanxz API benar-benar gratis dan tanpa API key?", a: "Ya. Semua endpoint bisa dipanggil langsung tanpa registrasi maupun API key. Untuk menjaga kualitas layanan, berlaku batas 45 permintaan per menit untuk setiap alamat IP. IP yang berulang kali melewati batas akan diblokir dan bisa mengajukan banding ke owner lewat WhatsApp." },
-  { q: "Bagaimana format respons yang dikembalikan?", a: "Endpoint data mengembalikan JSON dengan pola { status, creator, result }. Bila terjadi kesalahan, kamu menerima { status: false, code, error } disertai kode HTTP yang sesuai. Endpoint kategori Image dan beberapa endpoint tools mengembalikan file gambar PNG secara langsung." },
+  { q: `Apakah ${SITE_NAME} benar-benar gratis dan tanpa API key?`, a: `Ya. Semua endpoint bisa dipanggil langsung tanpa registrasi maupun API key. Untuk menjaga kualitas layanan, berlaku batas ${RATE_LIMIT} permintaan per menit untuk setiap alamat IP. IP yang berulang kali melewati batas akan diblokir dan bisa mengajukan banding ke owner lewat WhatsApp.` },
+  { q: "Bagaimana format respons yang dikembalikan?", a: "Endpoint data mengembalikan JSON dengan pola { status, creator, result }. Bila terjadi kesalahan, kamu menerima { status: false, code, error } disertai kode HTTP yang sesuai. Endpoint kategori Image, Canvas, dan beberapa endpoint tools mengembalikan file gambar PNG secara langsung." },
   { q: "Bolehkah dipakai untuk bot WhatsApp, Telegram, atau Discord?", a: "Tentu. CORS terbuka dan responsnya ringan sehingga cocok dipakai pada bot, aplikasi web, dan proyek hobi. Mohon tidak menyalahgunakannya untuk spam atau aktivitas yang melanggar hukum." },
-  { q: "Dari mana data cuaca, gempa, dan jadwal sholat berasal?", a: "Gempa diambil langsung dari BMKG, cuaca dari Open-Meteo, dan jadwal sholat serta Al-Qur'an dari layanan terbuka yang terpercaya. Yanxz API merapikan datanya agar konsisten dan mudah dipakai." },
+  { q: "Dari mana data cuaca, gempa, dan jadwal sholat berasal?", a: `Gempa diambil langsung dari BMKG, cuaca dari Open-Meteo, dan jadwal sholat serta Al-Qur'an dari layanan terbuka yang terpercaya. ${SITE_NAME} merapikan datanya agar konsisten dan mudah dipakai.` },
   { q: "Bagaimana jika sebuah endpoint mengalami gangguan?", a: "Endpoint yang bergantung pada layanan pihak ketiga akan mengembalikan kode 502 atau 504 beserta penjelasan. Coba lagi beberapa saat kemudian; endpoint lain tidak terpengaruh." },
-  { q: "Bagaimana cara menyarankan endpoint baru?", a: "Katalog terus bertambah. Pilih kategori yang paling dekat di dokumentasi dan pantau pembaruannya di halaman ini." },
+  { q: "Bagaimana cara menyarankan endpoint baru?", a: "Kirim usulanmu ke owner lewat WhatsApp. Tautannya ada di bagian bawah halaman ini." },
 ];
+
+const sampleResponse = JSON.stringify({ status: true, creator: SITE_CREATOR, result: { quote: "Perjalanan seribu mil dimulai dengan satu langkah.", author: "Lao Tzu" } }, null, 2);
+
+const pickPaths = ["random/quote", "info/gempa", "islami/sholat", "info/cuaca"];
 
 export default function Home() {
   const meta = allMeta();
-  const chips = meta.map((e) => e.path);
-  const half = Math.ceil(chips.length / 2);
-  const rows = [chips.slice(0, half), chips.slice(half)];
+
+  const consoleList: ConsoleEndpoint[] = meta
+    .filter((e) => e.kind !== "html")
+    .map((e) => {
+      const path = e.path.replace(/^\/api\//, "");
+      const sp = new URLSearchParams();
+      for (const p of e.params) if (p.required && p.example) sp.set(p.name, p.example);
+      const qs = sp.toString();
+      return { path, title: e.title, sample: qs ? `${path}?${qs}` : path };
+    });
+  const picks = pickPaths.map((p) => consoleList.find((e) => e.path === p)).filter((e): e is ConsoleEndpoint => !!e);
+
+  const facts = [
+    { k: "Endpoint aktif", v: meta.length.toLocaleString("id-ID") },
+    { k: "Kategori", v: String(categories.length) },
+    { k: "Batas per IP", v: `${RATE_LIMIT} / menit` },
+  ];
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -67,257 +93,165 @@ export default function Home() {
 
   return (
     <>
-      {/* ───────── HERO ───────── */}
-      <section className="grain relative isolate overflow-hidden pt-32 sm:pt-40">
-        <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
-          <div className="aurora aurora-1 -left-40 -top-40 h-[620px] w-[620px]" />
-          <div className="aurora aurora-2 right-[-12%] top-10 h-[540px] w-[540px]" />
-          <div className="aurora aurora-3 bottom-[-10%] left-[30%] h-[460px] w-[460px]" />
-          <div className="grid-lines absolute inset-0" />
-          <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-bg to-transparent" />
-        </div>
-
-        <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-12 px-5 sm:px-8 lg:grid-cols-[1.05fr_1fr] lg:gap-16">
-          <div>
-            <div className="fade-up inline-flex items-center gap-2.5 rounded-full border border-linestrong bg-white/[0.03] py-1.5 pl-3 pr-4 text-xs text-muted backdrop-blur">
-              <span className="live-dot" />
-              <span>Semua layanan operasional</span>
-              <span className="h-3 w-px bg-line" />
-              <span className="font-mono text-fg">v1.0</span>
-            </div>
-
-            <h1 className="mt-7 font-display text-[2.75rem] font-semibold leading-[1.02] tracking-[-0.035em] sm:text-6xl lg:text-[4.4rem]">
-              {headline.map((w, i) => (
-                <span key={i}>
-                  <span
-                    className={`word ${w === "segala" ? "font-serif font-normal italic text-ember-gradient pr-1" : ""} ${w === "gratis" ? "text-ember-gradient" : ""}`}
-                    style={{ "--i": i } as React.CSSProperties}
-                  >
-                    {w}
-                  </span>{" "}
-                </span>
-              ))}
+      {/* ───────── Pembuka: judul + konsol uji coba ───────── */}
+      <section className="mx-auto max-w-6xl px-4 pb-16 pt-12 sm:px-6 sm:pt-16 lg:pb-24 lg:pt-20">
+        <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:grid-rows-[auto_1fr] lg:gap-x-12 lg:gap-y-10">
+          <div className="lg:col-span-5">
+            <h1 className="font-mono text-[2rem] font-bold leading-[1.15] tracking-tight sm:text-[2.5rem] lg:text-5xl lg:leading-[1.1]">
+              {meta.length} endpoint REST API. Gratis, tanpa API key.
             </h1>
-
-            <p className="fade-up mt-6 max-w-xl text-base leading-relaxed text-muted sm:mt-7 sm:text-lg" style={{ "--d": "700ms" } as React.CSSProperties}>
-              Yanxz API menyatukan puluhan fitur dalam satu base URL: AI, QR Code, cuaca, gempa BMKG, Al-Qur&apos;an, kurs, dan banyak lagi. Tanpa
-              API key, tanpa daftar, tinggal panggil.
+            <p className="mt-6 max-w-[60ch] text-lg text-muted">
+              {`${SITE_NAME} menyatukan AI, downloader, canvas, pencarian, data BMKG, Al-Qur'an, komik, anime, dan film dalam satu base URL. Tidak perlu daftar: salin URL, kirim GET, terima JSON.`}
             </p>
 
-            <div className="fade-up mt-9" style={{ "--d": "850ms" } as React.CSSProperties}>
+            <div className="mt-8">
               <BaseUrlBox fallback={SITE_URL} />
             </div>
 
-            <div className="fade-up mt-8 flex flex-wrap items-center gap-3" style={{ "--d": "1000ms" } as React.CSSProperties}>
-              <Link href="/docs" className="btn-primary group inline-flex w-full items-center justify-center gap-2 rounded-full px-7 py-3.5 text-sm font-semibold sm:w-auto">
-                Jelajahi dokumentasi
-                <ArrowIcon className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-              </Link>
-              <Link href="#mulai" className="btn-ghost w-full rounded-full px-7 py-3.5 text-center text-sm font-medium text-fg sm:w-auto">
-                Lihat cara pakai
+            <div className="mt-4">
+              <Link href="/docs" className="btn btn-secondary w-full sm:w-auto">
+                Buka dokumentasi
+                <ArrowIcon />
               </Link>
             </div>
           </div>
 
-          <div className="fade-up relative" style={{ "--d": "600ms" } as React.CSSProperties}>
-            <div className="float-slow">
-              <HeroTerminal />
-            </div>
+          <div className="min-w-0 lg:col-span-7 lg:row-span-2">
+            <TryConsole endpoints={consoleList} picks={picks} fallback={SITE_URL} sample={sampleResponse} />
           </div>
-        </div>
 
-        {/* statistik */}
-        <div className="mx-auto mt-16 max-w-7xl px-5 sm:mt-24 sm:px-8">
-          <dl className="grid grid-cols-2 border-y border-line lg:grid-cols-4">
-            {[
-              { k: "Endpoint aktif", v: <CountUp to={meta.length} /> },
-              { k: "Kategori", v: <CountUp to={categories.length} /> },
-              { k: "API key dibutuhkan", v: <span>0</span> },
-              { k: "Total permintaan dilayani", v: <LiveRequests /> },
-            ].map((s, i) => (
-              <div key={s.k} className={`px-2 py-8 sm:px-6 ${i % 2 === 1 ? "border-l border-line" : ""} ${i >= 2 ? "border-t border-line lg:border-t-0" : ""} ${i === 2 ? "lg:border-l" : ""}`}>
-                <dd className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">{s.v}</dd>
-                <dt className="mt-2 text-sm text-muted">{s.k}</dt>
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-6 self-start border-t border-line pt-6 lg:col-span-5">
+            {facts.map((f) => (
+              <div key={f.k}>
+                <dt className="text-sm text-muted">{f.k}</dt>
+                <dd className="tnum mt-1 font-mono text-2xl font-bold">{f.v}</dd>
               </div>
             ))}
+            <div>
+              <dt className="text-sm text-muted">Permintaan dilayani</dt>
+              <dd className="mt-1 font-mono text-2xl font-bold">
+                <LiveRequests />
+              </dd>
+            </div>
           </dl>
         </div>
       </section>
 
-      {/* ───────── MARQUEE ───────── */}
-      <section className="marquee-wrap marquee-mask mt-16 space-y-3 overflow-hidden" aria-hidden>
-        {rows.map((row, r) => (
-          <div key={r} className={`marquee ${r === 1 ? "rev" : ""}`}>
-            {[...row, ...row].map((p, i) => (
-              <span key={i} className="mx-1.5 inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-line bg-surface/60 px-4 py-2 font-mono text-xs text-muted">
-                <span className="text-mint">GET</span>
-                {p}
-              </span>
-            ))}
-          </div>
-        ))}
-      </section>
+      {/* ───────── Kategori ───────── */}
+      <section id="kategori" className="border-t border-line bg-card">
+        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-24">
+          <h2 className="font-mono text-2xl font-bold tracking-tight sm:text-[2rem]">{categories.length} kategori, satu base URL</h2>
+          <p className="mt-4 max-w-[65ch] text-muted">Setiap kategori punya halaman dokumentasi sendiri, lengkap dengan parameter, playground, dan contoh kode.</p>
 
-      {/* ───────── KATEGORI ───────── */}
-      <section id="kategori" className="mx-auto mt-20 max-w-7xl px-5 sm:mt-28 sm:px-8 lg:mt-36">
-        <Reveal>
-          <p className="font-mono text-xs uppercase tracking-[0.18em] text-ember">01 — Kategori</p>
-          <h2 className="mt-4 max-w-3xl font-display text-4xl font-semibold leading-[1.05] tracking-[-0.03em] sm:text-5xl">
-            Satu base URL, <span className="font-serif font-normal italic text-muted">tujuh</span> kategori yang saling melengkapi.
-          </h2>
-        </Reveal>
-
-        <div className="mt-14 grid grid-cols-1 gap-4 lg:grid-cols-12">
-          {categories.map((c, i) => {
-            const items = meta.filter((e) => e.category === c.id);
-            const spans = ["lg:col-span-7", "lg:col-span-5", "lg:col-span-4", "lg:col-span-4", "lg:col-span-4", "lg:col-span-5", "lg:col-span-7"];
-            return (
-              <Reveal key={c.id} delay={(i % 3) * 90} className={spans[i]}>
-                <SpotlightCard className="group h-full rounded-3xl p-7 sm:p-8">
-                  <div className="flex items-start justify-between">
-                    <span className="grid h-12 w-12 place-items-center rounded-2xl border border-line bg-surface2 text-ember transition-transform duration-500 group-hover:-rotate-6 group-hover:scale-110">
-                      <CategoryIcon id={c.id} className="h-6 w-6" />
+          <Stagger className="mt-10 grid grid-cols-1 gap-2 md:grid-cols-2">
+            {categories.map((c, i) => {
+              const count = meta.filter((e) => e.category === c.id).length;
+              return (
+                <li key={c.id} style={{ "--i": i } as CSSProperties}>
+                  <Link
+                    href={`/docs/${c.id}`}
+                    className="group flex min-h-[4.5rem] items-center gap-4 border border-line bg-bg px-4 py-3 transition-colors duration-150 hover:border-control hover:bg-subtle"
+                  >
+                    <CategoryIcon id={c.id} className="h-6 w-6 shrink-0 text-ok" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-mono text-base font-bold">{c.name}</span>
+                      <span className="block text-sm text-muted">{c.tagline}</span>
                     </span>
-                    <span className="font-mono text-xs text-dim">{String(items.length).padStart(2, "0")} endpoint</span>
-                  </div>
-                  <h3 className="mt-8 font-display text-2xl font-semibold tracking-tight">
-                    <Link href={`/docs/${c.id}`} className="after:absolute after:inset-0 after:content-['']">
-                      {c.name}
-                    </Link>
-                  </h3>
-                  <p className="mt-3 max-w-md text-[15px] leading-relaxed text-muted">{c.description}</p>
-                  <div className="mt-6 flex flex-wrap gap-2">
-                    {items.slice(0, 4).map((e) => (
-                      <span key={e.slug} className="rounded-md bg-white/[0.04] px-2.5 py-1 font-mono text-[11px] text-muted">
-                        /{e.slug}
-                      </span>
-                    ))}
-                    {items.length > 4 && <span className="rounded-md px-2 py-1 font-mono text-[11px] text-dim">+{items.length - 4}</span>}
-                  </div>
-                  <div className="mt-7 flex items-center gap-2 text-sm font-medium text-fg">
-                    Buka dokumentasi
-                    <ArrowIcon className="h-4 w-4 text-ember transition-transform duration-300 group-hover:translate-x-1.5" />
-                  </div>
-                </SpotlightCard>
-              </Reveal>
-            );
-          })}
+                    <span className="tnum shrink-0 font-mono text-sm text-muted">
+                      {count}
+                      <span className="sr-only"> endpoint</span>
+                    </span>
+                    <ArrowIcon className="shrink-0 text-muted transition-transform duration-150 ease-out group-hover:translate-x-1 group-hover:text-fg" />
+                  </Link>
+                </li>
+              );
+            })}
+          </Stagger>
         </div>
       </section>
 
-      {/* ───────── CARA PAKAI ───────── */}
-      <section id="mulai" className="mx-auto mt-24 max-w-7xl px-5 sm:mt-32 sm:px-8 lg:mt-40">
-        <div className="grid grid-cols-1 gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-start lg:gap-16">
-          <Reveal>
-            <p className="font-mono text-xs uppercase tracking-[0.18em] text-ember">02 — Cara pakai</p>
-            <h2 className="mt-4 font-display text-4xl font-semibold leading-[1.05] tracking-[-0.03em] sm:text-5xl">
-              Dari nol ke respons <span className="font-serif font-normal italic text-muted">dalam satu menit.</span>
-            </h2>
-            <ol className="mt-12 space-y-0">
-              {[
-                { t: "Pilih endpoint", d: "Cari fitur yang kamu butuhkan di dokumentasi, lalu lihat parameter yang diperlukan." },
-                { t: "Kirim permintaan GET", d: "Tempel base URL, tambahkan path dan query string. Tidak ada header khusus atau autentikasi." },
-                { t: "Terima hasilnya", d: "Ambil field result dari JSON, atau langsung tampilkan gambarnya di tag <img>." },
-              ].map((s, i) => (
-                <li key={s.t} className="group relative flex gap-6 border-t border-line py-7 last:border-b">
-                  <span className="font-mono text-sm text-dim transition-colors group-hover:text-ember">0{i + 1}</span>
+      {/* ───────── Cara pakai ───────── */}
+      <section id="mulai" className="border-t border-line">
+        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-10 px-4 py-16 sm:px-6 lg:grid-cols-12 lg:gap-12 lg:py-24">
+          <div className="lg:col-span-5">
+            <h2 className="font-mono text-2xl font-bold tracking-tight sm:text-[2rem]">Dari URL ke respons dalam tiga langkah</h2>
+            <ol className="mt-8 space-y-6">
+              {steps.map((s, i) => (
+                <li key={s.t} className="flex gap-4">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center border border-control font-mono text-sm font-bold" aria-hidden>
+                    {i + 1}
+                  </span>
                   <div>
-                    <h3 className="font-display text-xl font-semibold tracking-tight">{s.t}</h3>
-                    <p className="mt-2 max-w-md text-[15px] leading-relaxed text-muted">{s.d}</p>
+                    <h3 className="font-mono text-lg font-bold">{s.t}</h3>
+                    <p className="mt-1 max-w-[55ch] text-muted">{s.d}</p>
                   </div>
                 </li>
               ))}
             </ol>
-          </Reveal>
+          </div>
 
-          <Reveal delay={150} className="space-y-4 lg:sticky lg:top-28">
+          <div className="min-w-0 space-y-2 lg:col-span-7">
             <CodeTabs fallback={SITE_URL} path="/api/random/quote" />
-            <div className="overflow-hidden rounded-2xl border border-line bg-surface">
-              <div className="flex items-center gap-3 border-b border-line px-5 py-3 font-mono text-[11px]">
-                <span className="text-mint">● 200 OK</span>
-                <span className="text-dim">application/json</span>
+            <div className="bg-code text-codefg">
+              <div className="flex min-h-11 items-center gap-4 border-b border-codeline px-4 font-mono text-sm text-codemuted">
+                <span className="inline-flex items-center gap-2 font-semibold text-codeok">
+                  <span className="h-2 w-2 bg-codeok" aria-hidden />
+                  200 OK
+                </span>
+                <span>application/json</span>
               </div>
-              <pre className="overflow-x-auto p-5 font-mono text-[13px] leading-relaxed text-[#cfc7ba]">
-                <code>
-                  {"{\n  "}
-                  <span className="json-key">&quot;status&quot;</span>: <span className="json-bool">true</span>,{"\n  "}
-                  <span className="json-key">&quot;creator&quot;</span>: <span className="json-str">&quot;Yanxz&quot;</span>,{"\n  "}
-                  <span className="json-key">&quot;result&quot;</span>
-                  {": {\n    "}
-                  <span className="json-key">&quot;quote&quot;</span>: <span className="json-str">&quot;Perjalanan seribu mil dimulai dengan satu langkah.&quot;</span>,{"\n    "}
-                  <span className="json-key">&quot;author&quot;</span>: <span className="json-str">&quot;Lao Tzu&quot;</span>
-                  {"\n  }\n}"}
-                </code>
-              </pre>
+              <pre tabIndex={0} className="overflow-x-auto p-4 font-mono text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: colorizeJson(sampleResponse) }} />
             </div>
-          </Reveal>
+          </div>
         </div>
       </section>
 
-      {/* ───────── KEUNGGULAN ───────── */}
-      <section className="mx-auto mt-24 max-w-7xl px-5 sm:mt-32 sm:px-8 lg:mt-40">
-        <Reveal>
-          <p className="font-mono text-xs uppercase tracking-[0.18em] text-ember">03 — Keunggulan</p>
-          <h2 className="mt-4 max-w-3xl font-display text-4xl font-semibold leading-[1.05] tracking-[-0.03em] sm:text-5xl">
-            Dirancang supaya kamu fokus membangun, <span className="font-serif font-normal italic text-muted">bukan mengurus akses.</span>
-          </h2>
-        </Reveal>
-        <div className="mt-14 grid grid-cols-1 border-t border-line sm:grid-cols-2 lg:grid-cols-3">
-          {features.map((f, i) => (
-            <Reveal key={f.t} delay={(i % 3) * 80} className="group border-b border-line p-7 transition-colors hover:bg-white/[0.02] sm:p-9 lg:[&:not(:nth-child(3n+1))]:border-l">
-              <span className="font-mono text-xs text-dim">0{i + 1}</span>
-              <h3 className="mt-5 font-display text-xl font-semibold tracking-tight transition-colors group-hover:text-ember">{f.t}</h3>
-              <p className="mt-3 text-[15px] leading-relaxed text-muted">{f.d}</p>
-            </Reveal>
-          ))}
+      {/* ───────── Keunggulan ───────── */}
+      <section className="border-t border-line bg-card">
+        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-24">
+          <h2 className="max-w-[24ch] font-mono text-2xl font-bold tracking-tight sm:text-[2rem]">Fokus membangun, bukan mengurus akses</h2>
+          <ul className="mt-10 grid grid-cols-1 gap-x-12 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+            {features.map((f) => (
+              <li key={f.t} className="border-t-2 border-fg pt-4">
+                <h3 className="font-mono text-lg font-bold">{f.t}</h3>
+                <p className="mt-2 text-muted">{f.d}</p>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
       {/* ───────── FAQ ───────── */}
-      <section id="faq" className="mx-auto mt-24 max-w-4xl px-5 sm:mt-32 sm:px-8 lg:mt-40">
-        <Reveal>
-          <p className="font-mono text-xs uppercase tracking-[0.18em] text-ember">04 — FAQ</p>
-          <h2 className="mt-4 font-display text-4xl font-semibold leading-[1.05] tracking-[-0.03em] sm:text-5xl">Pertanyaan yang sering muncul</h2>
-        </Reveal>
-        <div className="mt-12 border-t border-line">
-          {faqs.map((f, i) => (
-            <Reveal key={f.q} delay={i * 40}>
-              <details className="group border-b border-line">
-                <summary className="flex cursor-pointer items-center justify-between gap-6 py-6 text-left">
-                  <h3 className="font-display text-lg font-medium tracking-tight transition-colors group-hover:text-ember sm:text-xl">{f.q}</h3>
-                  <span className="faq-plus grid h-8 w-8 shrink-0 place-items-center rounded-full border border-line text-lg leading-none text-muted transition-transform duration-300">+</span>
+      <section id="faq" className="border-t border-line">
+        <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:py-24">
+          <h2 className="font-mono text-2xl font-bold tracking-tight sm:text-[2rem]">Pertanyaan yang sering muncul</h2>
+          <div className="mt-8 border-t border-line">
+            {faqs.map((f) => (
+              <details key={f.q} className="border-b border-line">
+                <summary className="flex min-h-14 items-center justify-between gap-4 py-3 transition-colors duration-150 hover:text-ok">
+                  <h3 className="text-base font-semibold sm:text-lg">{f.q}</h3>
+                  <ChevronIcon className="chev shrink-0 text-muted" />
                 </summary>
-                <p className="pb-7 pr-12 text-[15px] leading-relaxed text-muted">{f.a}</p>
+                <p className="faq-body max-w-[65ch] pb-6 text-muted">{f.a}</p>
               </details>
-            </Reveal>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* ───────── CTA ───────── */}
-      <section className="mx-auto mt-24 max-w-7xl px-5 sm:mt-32 sm:px-8 lg:mt-40">
-        <Reveal>
-          <div className="grain relative isolate overflow-hidden rounded-[2rem] border border-linestrong bg-surface px-6 py-14 text-center sm:px-16 sm:py-20">
-            <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
-              <div className="aurora aurora-1 left-[-10%] top-[-60%] h-[420px] w-[420px]" />
-              <div className="aurora aurora-2 bottom-[-70%] right-[-5%] h-[420px] w-[420px]" />
-              <div className="grid-lines absolute inset-0 opacity-60" />
-            </div>
-            <h2 className="mx-auto max-w-2xl font-display text-4xl font-semibold leading-[1.05] tracking-[-0.03em] sm:text-6xl">
-              Mulai dengan <span className="font-serif font-normal italic text-ember-gradient">satu request.</span>
-            </h2>
-            <p className="mx-auto mt-6 max-w-lg text-muted">Buka dokumentasi, pilih endpoint, tekan tombol kirim. Hasilnya langsung muncul di layar.</p>
-            <div className="mt-10 flex flex-wrap justify-center gap-3">
-              <Link href="/docs" className="btn-primary group inline-flex w-full items-center justify-center gap-2 rounded-full px-8 py-4 text-sm font-semibold sm:w-auto">
-                Buka dokumentasi
-                <ArrowIcon className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-              </Link>
-              <a href="/api" className="btn-ghost w-full rounded-full px-8 py-4 text-sm font-medium sm:w-auto">
-                Lihat indeks JSON
-              </a>
-            </div>
+      {/* ───────── Kontak ───────── */}
+      <section className="border-t border-line bg-card">
+        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-16 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:py-20">
+          <div>
+            <h2 className="font-mono text-2xl font-bold tracking-tight sm:text-[2rem]">Belum ketemu jawabannya?</h2>
+            <p className="mt-3 max-w-[60ch] text-muted">Tanya langsung ke owner, laporkan endpoint yang bermasalah, atau usulkan fitur baru.</p>
           </div>
-        </Reveal>
+          <a href={APPEAL_URL} target="_blank" rel="noopener" className="btn btn-secondary shrink-0">
+            Hubungi lewat WhatsApp
+            <ExternalIcon />
+            <span className="sr-only">(terbuka di tab baru)</span>
+          </a>
+        </div>
       </section>
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />

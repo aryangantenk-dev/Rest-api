@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import { getStore } from "@/db/store";
 import type { Endpoint } from "./types";
 import { HttpError } from "./types";
+import { SITE_URL } from "@/lib/site";
 import { binaryResponse, fetchJson, fetchRaw, need, normalizeHex, num, opt, parseHttpUrl } from "./helpers";
 
 /* ---------- kalkulator aman (tanpa eval) ---------- */
@@ -157,7 +158,7 @@ export const toolsEndpoints: Endpoint[] = [
     title: "QR Code Generator",
     description: "Ubah teks atau tautan apa pun menjadi gambar QR Code PNG dengan warna dan ukuran yang bisa diatur.",
     params: [
-      { name: "text", required: true, description: "Teks atau URL yang akan dijadikan QR.", example: "https://yanxz.dev" },
+      { name: "text", required: true, description: "Teks atau URL yang akan dijadikan QR.", example: SITE_URL },
       { name: "size", description: "Lebar gambar dalam piksel (128–1024).", example: "512" },
       { name: "dark", description: "Warna modul QR (hex tanpa #).", example: "111111" },
       { name: "light", description: "Warna latar (hex tanpa #).", example: "ffffff" },
@@ -208,8 +209,8 @@ export const toolsEndpoints: Endpoint[] = [
   },
   {
     category: "tools", slug: "shorturl", kind: "json",
-    title: "Pemendek URL (Yanxz)",
-    description: "Pemendek URL bawaan Yanxz API. Hasilnya tautan pendek di domain ini yang langsung bisa dipakai dan dihitung kliknya. URL yang sama selalu mendapat kode yang sama.",
+    title: "Pemendek URL (yanz.api)",
+    description: "Pemendek URL bawaan yanz.api. Hasilnya tautan pendek di domain ini yang langsung bisa dipakai dan dihitung kliknya. URL yang sama selalu mendapat kode yang sama.",
     params: [{ name: "url", required: true, description: "URL panjang yang akan dipendekkan.", example: "https://nextjs.org/docs/app/getting-started" }],
     handler: async ({ sp, origin }) => {
       const u = parseHttpUrl(need(sp, "url", 2000)).toString();
@@ -223,7 +224,7 @@ export const toolsEndpoints: Endpoint[] = [
         throw new HttpError(503, "Database pemendek URL sedang tidak dapat dihubungi. Coba lagi nanti.");
       }
       if (!link) throw new HttpError(500, "Gagal membuat tautan pendek.");
-      return { original: u, short: `${origin}/s/${link.code}`, code: link.code, hits: link.hits, provider: "yanxz" };
+      return { original: u, short: `${origin}/s/${link.code}`, code: link.code, hits: link.hits, provider: "yanz.api" };
     },
   },
   {
@@ -308,7 +309,7 @@ export const toolsEndpoints: Endpoint[] = [
     title: "Base64",
     description: "Encode atau decode teks Base64 dengan dukungan UTF-8 penuh.",
     params: [
-      { name: "text", required: true, description: "Teks input.", example: "Halo Yanxz API" },
+      { name: "text", required: true, description: "Teks input.", example: "Halo yanz.api" },
       { name: "mode", description: "encode atau decode. Default: encode.", example: "encode" },
     ],
     handler: async ({ sp }) => {
@@ -326,7 +327,7 @@ export const toolsEndpoints: Endpoint[] = [
     category: "tools", slug: "hash", kind: "json",
     title: "Hash Generator",
     description: "Hitung hash MD5, SHA-1, SHA-256, dan SHA-512 dari sebuah teks sekaligus.",
-    params: [{ name: "text", required: true, description: "Teks yang di-hash.", example: "yanxz" }],
+    params: [{ name: "text", required: true, description: "Teks yang di-hash.", example: "yanz" }],
     handler: async ({ sp }) => {
       const text = need(sp, "text");
       const h = (a: string) => crypto.createHash(a).update(text).digest("hex");
@@ -384,7 +385,7 @@ export const toolsEndpoints: Endpoint[] = [
     title: "JSON Formatter",
     description: "Validasi JSON lalu rapikan (pretty) atau kecilkan (minify) ukurannya.",
     params: [
-      { name: "json", required: true, description: "String JSON.", example: '{"nama":"yanxz","fitur":[1,2,3]}' },
+      { name: "json", required: true, description: "String JSON.", example: '{"nama":"yanz","fitur":[1,2,3]}' },
       { name: "indent", description: "Jumlah spasi indentasi (0–8). Default 2.", example: "2" },
     ],
     handler: async ({ sp }) => {

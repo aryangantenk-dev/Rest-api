@@ -38,7 +38,7 @@ export function CategoryIcon({ id, className }: { id: CategoryId } & P) {
     case "image":
       return (
         <svg {...base} className={className}>
-          <rect x="3" y="4" width="18" height="16" rx="2.5" />
+          <rect x="3" y="4" width="18" height="16" rx="1" />
           <circle cx="9" cy="10" r="1.6" />
           <path d="M21 16l-5-5-8 8" />
         </svg>
@@ -46,7 +46,7 @@ export function CategoryIcon({ id, className }: { id: CategoryId } & P) {
     case "random":
       return (
         <svg {...base} className={className}>
-          <rect x="4" y="4" width="16" height="16" rx="3.5" />
+          <rect x="4" y="4" width="16" height="16" rx="1" />
           <circle cx="9" cy="9" r="1" fill="currentColor" />
           <circle cx="15" cy="15" r="1" fill="currentColor" />
           <circle cx="15" cy="9" r="1" fill="currentColor" />
@@ -106,7 +106,7 @@ export function CategoryIcon({ id, className }: { id: CategoryId } & P) {
     case "anime":
       return (
         <svg {...base} className={className}>
-          <rect x="3" y="5" width="18" height="13" rx="2.5" />
+          <rect x="3" y="5" width="18" height="13" rx="1" />
           <path d="M10 9l5 2.5-5 2.5V9z" />
           <path d="M8 21h8" />
         </svg>
@@ -114,7 +114,7 @@ export function CategoryIcon({ id, className }: { id: CategoryId } & P) {
     case "film":
       return (
         <svg {...base} className={className}>
-          <rect x="3" y="4" width="18" height="16" rx="2.5" />
+          <rect x="3" y="4" width="18" height="16" rx="1" />
           <path d="M7.5 4v16M16.5 4v16M3 9h4.5M3 15h4.5M16.5 9H21M16.5 15H21" />
         </svg>
       );
@@ -123,24 +123,32 @@ export function CategoryIcon({ id, className }: { id: CategoryId } & P) {
 
 export function ArrowIcon({ className }: P) {
   return (
-    <svg {...base} strokeWidth={1.8} className={className}>
+    <svg {...base} width={18} height={18} className={className}>
       <path d="M5 12h14M13 6l6 6-6 6" />
+    </svg>
+  );
+}
+
+export function ExternalIcon({ className }: P) {
+  return (
+    <svg {...base} width={18} height={18} className={className}>
+      <path d="M14 5h5v5M19 5l-8 8M11 6H6a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-5" />
     </svg>
   );
 }
 
 export function CopyIcon({ className }: P) {
   return (
-    <svg {...base} width={16} height={16} className={className}>
-      <rect x="8.5" y="8.5" width="11" height="11" rx="2.5" />
-      <path d="M15.5 8.5V6A2.5 2.5 0 0 0 13 3.5H6A2.5 2.5 0 0 0 3.5 6v7A2.5 2.5 0 0 0 6 15.5h2.5" />
+    <svg {...base} width={18} height={18} className={className}>
+      <rect x="8.5" y="8.5" width="11" height="11" />
+      <path d="M15.5 8.5v-4h-11v11h4" />
     </svg>
   );
 }
 
 export function CheckIcon({ className }: P) {
   return (
-    <svg {...base} width={16} height={16} strokeWidth={2} className={className}>
+    <svg {...base} width={18} height={18} className={className}>
       <path d="M5 12.5l4.5 4.5L19 7.5" />
     </svg>
   );
@@ -157,7 +165,7 @@ export function SearchIcon({ className }: P) {
 
 export function ChevronIcon({ className }: P) {
   return (
-    <svg {...base} width={18} height={18} strokeWidth={1.8} className={className}>
+    <svg {...base} width={18} height={18} className={className}>
       <path d="M6 9l6 6 6-6" />
     </svg>
   );
@@ -165,17 +173,51 @@ export function ChevronIcon({ className }: P) {
 
 export function PlayIcon({ className }: P) {
   return (
-    <svg {...base} width={14} height={14} fill="currentColor" stroke="none" className={className}>
-      <path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z" />
+    <svg {...base} width={18} height={18} className={className}>
+      <path d="M8 5.5v13l10.5-6.5L8 5.5z" />
     </svg>
   );
 }
 
+export function SunIcon({ className }: P) {
+  return (
+    <svg {...base} width={20} height={20} className={className}>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6L7 7M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4" />
+    </svg>
+  );
+}
+
+export function MoonIcon({ className }: P) {
+  return (
+    <svg {...base} width={20} height={20} className={className}>
+      <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" />
+    </svg>
+  );
+}
+
+export function MenuIcon({ className }: P) {
+  return (
+    <svg {...base} width={20} height={20} className={className}>
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </svg>
+  );
+}
+
+export function CloseIcon({ className }: P) {
+  return (
+    <svg {...base} width={20} height={20} className={className}>
+      <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
+  );
+}
+
+/** Tanda merek: kotak tajam berwarna aksen dengan huruf Y. */
 export function LogoMark({ className }: P) {
   return (
     <svg viewBox="0 0 32 32" className={className} aria-hidden>
-      <rect width="32" height="32" rx="9" fill="#ff6b3d" />
-      <path d="M9 9l7 8.5V24M23 9l-7 8.5" stroke="#14110e" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <rect width="32" height="32" fill="var(--accent)" />
+      <path d="M9 8l7 9.5V25M23 8l-7 9.5" stroke="var(--on-accent)" strokeWidth="3.2" strokeLinecap="square" strokeLinejoin="miter" fill="none" />
     </svg>
   );
 }

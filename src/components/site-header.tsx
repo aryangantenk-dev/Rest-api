@@ -3,87 +3,109 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LogoMark } from "./icons";
+import { CloseIcon, LogoMark, MenuIcon, MoonIcon, SunIcon } from "./icons";
 
 const links = [
-  { href: "/#kategori", label: "Kategori" },
-  { href: "/#mulai", label: "Cara Pakai" },
   { href: "/docs", label: "Dokumentasi" },
+  { href: "/#kategori", label: "Kategori" },
+  { href: "/#mulai", label: "Cara pakai" },
   { href: "/#faq", label: "FAQ" },
 ];
 
+/** Tombol tema: ikon diatur lewat CSS (.only-light / .only-dark), jadi tidak perlu state. */
+function ThemeToggle() {
+  return (
+    <button
+      type="button"
+      aria-label="Ganti tema terang atau gelap"
+      title="Ganti tema"
+      onClick={() => {
+        const root = document.documentElement;
+        const next = getComputedStyle(root).colorScheme.includes("dark") ? "light" : "dark";
+        root.dataset.theme = next;
+        try {
+          localStorage.setItem("theme", next);
+        } catch {
+          /* penyimpanan diblokir: tema tetap berganti untuk sesi ini */
+        }
+      }}
+      className="grid h-11 w-11 place-items-center text-muted transition-colors duration-150 hover:bg-subtle hover:text-fg"
+    >
+      <MoonIcon className="only-light" />
+      <SunIcon className="only-dark" />
+    </button>
+  );
+}
+
 export function SiteHeader() {
   const pathname = usePathname();
-  const [scrolled, setScrolled] = useState(false);
   // Menu seluler terikat ke halaman tempat ia dibuka, jadi otomatis tertutup saat berpindah halaman.
   const [openAt, setOpenAt] = useState<string | null>(null);
   const open = openAt === pathname;
   const setOpen = (next: boolean) => setOpenAt(next ? pathname : null);
 
   useEffect(() => {
-    const on = () => setScrolled(window.scrollY > 12);
-    on();
-    window.addEventListener("scroll", on, { passive: true });
-    return () => window.removeEventListener("scroll", on);
-  }, []);
+    if (!open) return;
+    const on = (ev: KeyboardEvent) => {
+      if (ev.key === "Escape") setOpenAt(null);
+    };
+    window.addEventListener("keydown", on);
+    return () => window.removeEventListener("keydown", on);
+  }, [open]);
 
   return (
-    <header className={`fixed inset-x-0 top-0 z-50 transition-all duration-500 ${scrolled || open ? "border-b border-line bg-bg/75 backdrop-blur-xl" : "border-b border-transparent"}`}>
-      <div className={`mx-auto flex max-w-7xl items-center justify-between px-5 transition-all duration-500 sm:px-8 ${scrolled ? "h-14" : "h-[72px]"}`}>
-        <Link href="/" onClick={() => setOpen(false)} className="group flex items-center gap-2.5" aria-label="Yanxz API — beranda">
-          <LogoMark className="h-8 w-8 transition-transform duration-500 group-hover:rotate-[-8deg] group-hover:scale-110" />
-          <span className="font-display text-lg font-semibold tracking-tight">
-            yanxz<span className="text-ember">.</span>api
+    <header className="fixed inset-x-0 top-0 z-50 border-b border-line bg-bg">
+      <div className="mx-auto flex h-[var(--header-h)] max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+        <Link href="/" onClick={() => setOpen(false)} className="flex min-h-11 items-center gap-2.5" aria-label="yanz.api, ke beranda">
+          <LogoMark className="h-7 w-7" />
+          <span className="font-mono text-lg font-bold tracking-tight">
+            yanz<span className="text-ok">.</span>api
           </span>
         </Link>
 
-        <nav aria-label="Navigasi utama" className="hidden items-center gap-1 md:flex">
+        <nav aria-label="Navigasi utama" className="hidden items-center md:flex">
           {links.map((l) => {
             const active = l.href === "/docs" && pathname.startsWith("/docs");
             return (
               <Link
                 key={l.href}
                 href={l.href}
-                className={`relative rounded-full px-4 py-2 text-sm transition-colors ${active ? "text-fg" : "text-muted hover:text-fg"}`}
+                aria-current={active ? "page" : undefined}
+                className={`relative flex min-h-11 items-center px-4 text-[0.9375rem] transition-colors duration-150 ${active ? "font-semibold text-fg" : "text-muted hover:text-fg"}`}
               >
                 {l.label}
-                {active && <span className="absolute inset-x-4 -bottom-0.5 h-px bg-ember" />}
+                {active && <span className="absolute inset-x-4 bottom-1 h-0.5 bg-accent" aria-hidden />}
               </Link>
             );
           })}
         </nav>
 
-        <div className="flex items-center gap-3">
-          <span className="hidden items-center gap-2 rounded-full border border-line px-3 py-1.5 font-mono text-[11px] text-muted lg:flex">
-            <span className="live-dot" /> operasional
-          </span>
-          <Link href="/docs" onClick={() => setOpen(false)} className="btn-primary hidden rounded-full px-5 py-2 text-sm font-semibold sm:inline-block">
-            Coba sekarang
-          </Link>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
           <button
             type="button"
             aria-label={open ? "Tutup menu" : "Buka menu"}
             aria-expanded={open}
+            aria-controls="menu-seluler"
             onClick={() => setOpen(!open)}
-            className="relative h-10 w-10 rounded-full border border-line md:hidden"
+            className="grid h-11 w-11 place-items-center border border-control text-fg transition-colors duration-150 hover:bg-subtle md:hidden"
           >
-            <span className={`absolute left-1/2 top-[15px] h-px w-4 -translate-x-1/2 bg-fg transition-transform duration-300 ${open ? "translate-y-[4px] rotate-45" : ""}`} />
-            <span className={`absolute left-1/2 top-[24px] h-px w-4 -translate-x-1/2 bg-fg transition-transform duration-300 ${open ? "-translate-y-[5px] -rotate-45" : ""}`} />
+            {open ? <CloseIcon /> : <MenuIcon />}
           </button>
         </div>
       </div>
 
-      <div className={`grid transition-all duration-500 md:hidden ${open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
-        <nav aria-label="Navigasi seluler" className="overflow-hidden" inert={!open}>
-          <div className="flex flex-col gap-1 px-5 pb-6 pt-2">
-            {links.map((l) => (
-              <Link key={l.href} href={l.href} onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 font-display text-2xl tracking-tight text-fg/90 hover:bg-white/5">
+      <nav id="menu-seluler" aria-label="Navigasi seluler" data-open={open} className="panel border-t border-line bg-bg md:hidden">
+        <ul className="mx-auto max-w-6xl px-4 py-2 sm:px-6">
+          {links.map((l) => (
+            <li key={l.href} className="border-b border-line last:border-b-0">
+              <Link href={l.href} onClick={() => setOpen(false)} className="flex min-h-12 items-center text-base font-medium">
                 {l.label}
               </Link>
-            ))}
-          </div>
-        </nav>
-      </div>
+            </li>
+          ))}
+        </ul>
+      </nav>
     </header>
   );
 }

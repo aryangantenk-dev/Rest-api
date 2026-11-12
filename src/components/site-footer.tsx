@@ -1,29 +1,32 @@
 import Link from "next/link";
 import { categories } from "@/lib/api/categories";
+import { RATE_LIMIT } from "@/lib/limits";
 import { LogoMark } from "./icons";
+
+const linkClass = "inline-flex min-h-11 items-center text-muted transition-colors duration-150 hover:text-fg sm:min-h-8";
 
 export function SiteFooter({ total }: { total: number }) {
   return (
-    <footer className="relative mt-20 border-t border-line sm:mt-32">
-      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-10 px-5 py-12 sm:gap-12 sm:px-8 sm:py-16 md:grid-cols-[1.4fr_1fr_1fr]">
-        <div>
-          <Link href="/" className="inline-flex items-center gap-2.5" aria-label="Yanxz API">
-            <LogoMark className="h-8 w-8" />
-            <span className="font-display text-lg font-semibold tracking-tight">
-              yanxz<span className="text-ember">.</span>api
+    <footer className="border-t border-line bg-bg">
+      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-10 px-4 py-12 sm:px-6 md:grid-cols-12">
+        <div className="md:col-span-5">
+          <Link href="/" className="inline-flex min-h-11 items-center gap-2.5" aria-label="yanz.api, ke beranda">
+            <LogoMark className="h-7 w-7" />
+            <span className="font-mono text-lg font-bold tracking-tight">
+              yanz<span className="text-ok">.</span>api
             </span>
           </Link>
-          <p className="mt-5 max-w-sm text-sm leading-relaxed text-muted">
-            REST API gratis tanpa API key untuk developer, pelajar, dan pembuat bot. {total} endpoint, respons JSON konsisten, dan CORS terbuka.
+          <p className="mt-4 max-w-[45ch] text-sm text-muted">
+            {`REST API gratis tanpa API key untuk developer, pelajar, dan pembuat bot. ${total} endpoint, respons JSON konsisten, dan CORS terbuka.`}
           </p>
         </div>
 
-        <nav aria-label="Kategori API">
-          <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-dim">Kategori</h2>
-          <ul className="mt-5 space-y-3 text-sm">
+        <nav aria-label="Kategori API" className="md:col-span-4">
+          <h2 className="text-sm font-semibold">Kategori</h2>
+          <ul className="mt-3 grid grid-cols-2 gap-x-6 text-sm">
             {categories.map((c) => (
               <li key={c.id}>
-                <Link href={`/docs/${c.id}`} className="text-muted transition-colors hover:text-fg">
+                <Link href={`/docs/${c.id}`} className={linkClass}>
                   {c.name}
                 </Link>
               </li>
@@ -31,20 +34,24 @@ export function SiteFooter({ total }: { total: number }) {
           </ul>
         </nav>
 
-        <nav aria-label="Tautan">
-          <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-dim">Sumber</h2>
-          <ul className="mt-5 space-y-3 text-sm">
-            <li><Link href="/docs" className="text-muted transition-colors hover:text-fg">Dokumentasi lengkap</Link></li>
-            <li><a href="/api" className="text-muted transition-colors hover:text-fg">Indeks endpoint (JSON)</a></li>
-            <li><Link href="/#mulai" className="text-muted transition-colors hover:text-fg">Cara pakai</Link></li>
-            <li><Link href="/#faq" className="text-muted transition-colors hover:text-fg">Pertanyaan umum</Link></li>
+        <nav aria-label="Tautan" className="md:col-span-3">
+          <h2 className="text-sm font-semibold">Sumber</h2>
+          <ul className="mt-3 text-sm">
+            <li><Link href="/docs" className={linkClass}>Dokumentasi lengkap</Link></li>
+            <li>
+              {/* /api adalah route handler yang mengembalikan JSON, bukan halaman, jadi dibuka dengan navigasi biasa. */}
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+              <a href="/api" className={linkClass}>Indeks endpoint (JSON)</a>
+            </li>
+            <li><Link href="/#mulai" className={linkClass}>Cara pakai</Link></li>
+            <li><Link href="/#faq" className={linkClass}>Pertanyaan umum</Link></li>
           </ul>
         </nav>
       </div>
       <div className="border-t border-line">
-        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-5 py-6 text-xs text-dim sm:flex-row sm:items-center sm:justify-between sm:px-8">
-          <p>© {new Date().getFullYear()} Yanxz API. Dibuat dengan teliti di Indonesia.</p>
-          <p className="font-mono">Batas: 45 permintaan / menit / IP</p>
+        <div className="mx-auto flex max-w-6xl flex-col gap-1 px-4 py-5 text-sm text-muted sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <p>© {new Date().getFullYear()} yanz.api</p>
+          <p className="tnum">Batas {RATE_LIMIT} permintaan per menit untuk setiap IP</p>
         </div>
       </div>
     </footer>

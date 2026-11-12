@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Pemasang "film-proxy" untuk VPS Ubuntu (22.04 / 24.04).
 #
-# Fungsinya: meneruskan permintaan dari Yanxz API (Vercel) ke situs film lewat
+# Fungsinya: meneruskan permintaan dari yanz.api (Vercel) ke situs film lewat
 # IP VPS ini. Hanya host di ALLOW_HOSTS yang diteruskan, dan hanya bila
 # permintaan membawa header x-proxy-key yang benar.
 #
@@ -222,7 +222,7 @@ chmod 600 "$ENV_FILE"
 if has_systemd; then
   cat > "$UNIT" <<EOF
 [Unit]
-Description=film-proxy (penerus permintaan Yanxz API)
+Description=film-proxy (penerus permintaan yanz.api)
 After=network-online.target
 Wants=network-online.target
 

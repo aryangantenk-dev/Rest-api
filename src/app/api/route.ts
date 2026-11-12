@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { allMeta } from "@/lib/api/registry";
 import { categories } from "@/lib/api/categories";
-import { getOrigin } from "@/lib/site";
+import { SITE_CREATOR, SITE_NAME, getOrigin } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
@@ -12,8 +12,8 @@ export async function GET(req: Request) {
     JSON.stringify(
       {
         status: true,
-        name: "Yanxz API",
-        creator: "Yanxz",
+        name: SITE_NAME,
+        creator: SITE_CREATOR,
         baseUrl: `${origin}/api`,
         docs: `${origin}/docs`,
         apiKey: "not required",

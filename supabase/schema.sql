@@ -1,4 +1,4 @@
--- Skema Yanxz API untuk Supabase (backend REST).
+-- Skema yanz.api untuk Supabase (backend REST).
 -- Jalankan sekali di SQL Editor Supabase. Aman dijalankan ulang.
 --
 -- RLS aktif tanpa policy, jadi tabel hanya bisa diakses dengan service role /

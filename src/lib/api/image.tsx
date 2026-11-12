@@ -23,7 +23,7 @@ export const imageEndpoints: Endpoint[] = [
     params: [
       { name: "width", description: "Lebar (50–2000). Default 600.", example: "600" },
       { name: "height", description: "Tinggi (50–2000). Default 400.", example: "400" },
-      { name: "text", description: "Teks di tengah. Default ukuran gambar.", example: "Yanxz API" },
+      { name: "text", description: "Teks di tengah. Default ukuran gambar.", example: "yanz.api" },
       { name: "bg", description: "Warna latar hex.", example: "1f1b18" },
       { name: "color", description: "Warna teks hex.", example: "ff7a45" },
     ],
@@ -49,7 +49,7 @@ export const imageEndpoints: Endpoint[] = [
     title: "Avatar Inisial",
     description: "Avatar bulat dari inisial nama dengan warna otomatis yang konsisten untuk setiap nama.",
     params: [
-      { name: "name", required: true, description: "Nama lengkap.", example: "Yanxz Dev" },
+      { name: "name", required: true, description: "Nama lengkap.", example: "Yanz Dev" },
       { name: "size", description: "Ukuran piksel (32–512). Default 256.", example: "256" },
       { name: "bg", description: "Warna latar hex. Default otomatis dari nama.", example: "" },
       { name: "rounded", description: "true untuk bulat penuh. Default true.", example: "true" },
@@ -100,7 +100,7 @@ export const imageEndpoints: Endpoint[] = [
     title: "Gradient Wallpaper",
     description: "Wallpaper gradien PNG. Seed yang sama selalu menghasilkan gambar yang sama.",
     params: [
-      { name: "seed", description: "Teks seed. Default acak.", example: "yanxz" },
+      { name: "seed", description: "Teks seed. Default acak.", example: "yanz" },
       { name: "width", description: "Lebar (100–2000). Default 1200.", example: "1200" },
       { name: "height", description: "Tinggi (100–2000). Default 630.", example: "630" },
     ],
