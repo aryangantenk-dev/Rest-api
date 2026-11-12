@@ -64,6 +64,8 @@ async function skGet(path: string, what = "Data", ttl = SK_TTL): Promise<J> {
   }
   if (data.status === false || data.success === false || r.status < 200 || r.status >= 300) {
     const msg = str(data.message) ?? str(data.error);
+    // Untuk id yang tidak dikenal, API sumber menjawab HTTP 500 alih-alih 404.
+    if (r.status === 500 && /^\/(detail|person)\//.test(path)) throw new HttpError(404, `${what} tidak ditemukan di Sankanime (sumber menjawab HTTP 500).`);
     if (r.status >= 500) throw new HttpError(502, `Sankanime sedang bermasalah (HTTP ${r.status})${msg ? `: ${msg}` : "."}`);
     throw new HttpError(404, `${what} tidak ditemukan di Sankanime${msg ? ` (${msg})` : ""}.`);
   }
