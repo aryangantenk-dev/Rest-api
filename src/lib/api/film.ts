@@ -1,9 +1,10 @@
 import { load, type CheerioAPI } from "cheerio";
 import type { Endpoint } from "./types";
 import { HttpError } from "./types";
-import { isPrivateHost, need, num, opt } from "./helpers";
-import { absUrl, clean, cleanSlug, escapeHtml, imgSrc, type El } from "./scrape";
+import { need, num, opt } from "./helpers";
+import { absUrl, clean, cleanSlug, imgSrc, type El } from "./scrape";
 import { proxyText } from "./filmproxy";
+import { sankaEndpoints } from "./sanka";
 
 /*
  * Kategori film. LK21 menolak IP server Vercel, jadi semua permintaan dititipkan
@@ -174,49 +175,23 @@ function lkPeople($: CheerioAPI, scope: El, prefix: "artist" | "director") {
 }
 
 type LkEpisode = { episode: number | null; title: string | null; slug: string; url: string };
-type LkSeason = { season: number; total: number; episodes: LkEpisode[] };
-
-/** Buka halaman judul: host film dulu, lalu host serial (serial dan episodenya tinggal di host terpisah). */
-async function lkOpen(slug: string): Promise<{ $: CheerioAPI; url: string }> {
-  // Slug episode sudah pasti ada di host serial: lewati satu permintaan yang pasti 404.
-  if (!/-season-\d+-episode-\d+/.test(slug)) {
-    try {
-      const page = await lkPage(`${LK}/${slug}`);
-      if (page.$("h1").first().text().trim() && page.$(".movie-info").length) return page;
-    } catch (e) {
-      if (!(e instanceof HttpError) || e.status !== 404) throw e;
-    }
-  }
-  try {
-    return await lkPage(`${LK_SERIES}/${slug}`);
-  } catch (e) {
-    if (e instanceof HttpError && e.status === 404) throw new HttpError(404, `Judul '${slug}' tidak ditemukan di ${LK_NAME}.`);
-    throw e;
-  }
-}
-
-/** Daftar episode serial: <script id="season-data"> berisi JSON { "<season>": [{ episode_no, title, slug }] }. */
-function lkSeasons($: CheerioAPI): LkSeason[] {
-  const seasons: LkSeason[] = [];
-  try {
-    const data = JSON.parse($("#season-data").first().text() || "{}") as Record<string, { episode_no?: number | string; title?: string; slug?: string }[]>;
-    for (const [k, list] of Object.entries(data)) {
-      if (!Array.isArray(list)) continue;
-      const episodes = list
-        .filter((e) => e && typeof e.slug === "string" && e.slug)
-        .map((e) => ({ episode: numOrNull(String(e.episode_no ?? "")), title: clean(e.title) || null, slug: e.slug as string, url: `${LK_SERIES}/${e.slug}` }))
-        .sort((a, b) => (a.episode ?? 0) - (b.episode ?? 0));
-      seasons.push({ season: Number(k) || seasons.length + 1, total: episodes.length, episodes });
-    }
-    seasons.sort((a, b) => a.season - b.season);
-  } catch {
-    /* format berubah: biarkan kosong */
-  }
-  return seasons;
-}
 
 async function lkDetail(slug: string) {
-  const { $, url } = await lkOpen(slug);
+  let page: { $: CheerioAPI; url: string };
+  try {
+    page = await lkPage(`${LK}/${slug}`);
+    if (!page.$("h1").first().text().trim() || !page.$(".movie-info").length) throw new HttpError(404, "kosong");
+  } catch (e) {
+    if (!(e instanceof HttpError) || e.status !== 404) throw e;
+    // Serial tinggal di host terpisah.
+    try {
+      page = await lkPage(`${LK_SERIES}/${slug}`);
+    } catch (e2) {
+      if (e2 instanceof HttpError && e2.status === 404) throw new HttpError(404, `Judul '${slug}' tidak ditemukan di ${LK_NAME}.`);
+      throw e2;
+    }
+  }
+  const { $, url } = page;
   const info = $(".movie-info");
   const rawTitle = clean(info.find("h1").first().text());
   if (!rawTitle) throw new HttpError(404, `Judul '${slug}' tidak ditemukan di ${LK_NAME}.`);
@@ -245,7 +220,24 @@ async function lkDetail(slug: string) {
   const synEl = info.find(".synopsis").first();
   const trailer = $("a.yt-lightbox[href]").first().attr("href") || $(".trailer-series iframe").first().attr("src") || null;
 
-  const seasons = series ? lkSeasons($) : [];
+  // Daftar episode serial: <script id="season-data"> berisi JSON { "<season>": [{ episode_no, title, slug }] }.
+  const seasons: { season: number; total: number; episodes: LkEpisode[] }[] = [];
+  if (series) {
+    try {
+      const data = JSON.parse($("#season-data").first().text() || "{}") as Record<string, { episode_no?: number | string; title?: string; slug?: string }[]>;
+      for (const [k, list] of Object.entries(data)) {
+        if (!Array.isArray(list)) continue;
+        const episodes = list
+          .filter((e) => e && typeof e.slug === "string" && e.slug)
+          .map((e) => ({ episode: numOrNull(String(e.episode_no ?? "")), title: clean(e.title) || null, slug: e.slug as string, url: `${LK_SERIES}/${e.slug}` }))
+          .sort((a, b) => (a.episode ?? 0) - (b.episode ?? 0));
+        seasons.push({ season: Number(k) || seasons.length + 1, total: episodes.length, episodes });
+      }
+      seasons.sort((a, b) => a.season - b.season);
+    } catch {
+      /* format berubah: biarkan kosong */
+    }
+  }
 
   const related: { title: string; slug: string; year: number | null; poster: string | null; url: string }[] = [];
   $(".video-list li a[href]").each((_, n) => {
@@ -282,196 +274,6 @@ async function lkDetail(slug: string) {
     related: related.slice(0, 20),
     url,
   };
-}
-
-/* ------------------------------------------------------------ player ---- */
-
-const LK_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
-
-type LkServer = {
-  no: number;
-  name: string;
-  server: string;
-  /** Alamat player yang bisa dijadikan src <iframe>; null bila tidak berhasil didapat. */
-  url: string | null;
-  /** true: bisa dipasang di situs mana pun. false: ditolak di luar LK21 atau videonya hilang. null: tidak sempat diperiksa. */
-  embeddable: boolean | null;
-  note: string | null;
-  source: string;
-};
-
-const publicHttps = (raw: string): URL | null => {
-  try {
-    const u = new URL(raw);
-    return u.protocol === "https:" && !isPrivateHost(u.hostname) ? u : null;
-  } catch {
-    return null;
-  }
-};
-
-/**
- * Tautan player di halaman LK21 menunjuk halaman pembungkus (<host>/iframe3/<server>/<id>) yang hanya
- * mau dibingkai oleh domain LK21. Alamat player aslinya diminta pembungkus itu ke /api.php miliknya.
- */
-async function lkResolve(source: string): Promise<string | null> {
-  const u = publicHttps(source);
-  const m = u ? /^\/iframe\d*\/([a-z0-9_-]+)\/([A-Za-z0-9_-]+)/i.exec(u.pathname) : null;
-  if (!u || !m) return null;
-  try {
-    const res = await fetch(`${u.origin}/api.php`, {
-      method: "POST",
-      headers: { "user-agent": LK_UA, accept: "*/*", "content-type": "application/x-www-form-urlencoded", origin: u.origin, referer: u.href },
-      body: new URLSearchParams({ host: m[1], id: m[2] }).toString(),
-      cache: "no-store",
-      signal: AbortSignal.timeout(9000),
-    });
-    if (!res.ok) return null;
-    const d = (await res.json()) as { embedUrl?: unknown };
-    return typeof d.embedUrl === "string" && publicHttps(d.embedUrl) ? d.embedUrl : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Baca header halaman player: boleh dibingkai situs lain atau tidak, dan apakah videonya masih ada. */
-async function lkInspect(url: string, referer: string): Promise<{ embeddable: boolean | null; note: string | null }> {
-  try {
-    const res = await fetch(url, {
-      headers: { "user-agent": LK_UA, accept: "text/html,application/xhtml+xml,*/*;q=0.8", referer },
-      cache: "no-store",
-      signal: AbortSignal.timeout(9000),
-    });
-    const fa = /frame-ancestors([^;]*)/i.exec(res.headers.get("content-security-policy") || "");
-    const xfo = (res.headers.get("x-frame-options") || "").toLowerCase();
-    if ((fa && !/(^|\s)(\*|https:)(\s|$)/.test(fa[1])) || xfo === "deny" || xfo === "sameorigin") {
-      return { embeddable: false, note: "Player ini hanya mau diputar di dalam situs LK21, tidak bisa dipasang di situs lain." };
-    }
-    const head = (await res.text()).slice(0, 4000);
-    if (!res.ok || /<title>\s*(video not found|file not found|not found|404)/i.test(head)) {
-      return { embeddable: false, note: "Video tidak tersedia di server ini." };
-    }
-    return { embeddable: true, note: null };
-  } catch {
-    return { embeddable: null, note: "Server player tidak menjawab saat diperiksa." };
-  }
-}
-
-/** Halaman tonton: film (slug film) atau satu episode serial (slug serial + season/episode, atau slug episode). */
-async function lkWatch(slug: string, wantSeason: number | null, wantEpisode: number | null) {
-  let { $, url } = await lkOpen(slug);
-  let seasons = lkSeasons($);
-  const hasPlayer = () => $("#player-list a[data-url], #player-list a[href^='http'], #main-player[src]").length > 0;
-
-  if (seasons.length && (wantSeason !== null || wantEpisode !== null || !hasPlayer())) {
-    const here = new URL(url).pathname.split("/").filter(Boolean)[0] || slug;
-    const current = seasons.find((se) => se.episodes.some((e) => e.slug === here));
-    const season = wantSeason !== null ? seasons.find((se) => se.season === wantSeason) : current ?? seasons[0];
-    if (!season) throw new HttpError(404, `Season ${wantSeason} tidak ada. Season yang tersedia: ${seasons.map((se) => se.season).join(", ")}.`);
-    const ep = wantEpisode !== null ? season.episodes.find((e) => e.episode === wantEpisode) : season.episodes.find((e) => e.slug === here) ?? season.episodes[0];
-    if (!ep) throw new HttpError(404, `Episode ${wantEpisode} tidak ada di season ${season.season} (tersedia ${season.total} episode).`);
-    if (ep.slug !== here) {
-      ({ $, url } = await lkPage(`${LK_SERIES}/${ep.slug}`));
-      const again = lkSeasons($);
-      if (again.length) seasons = again;
-    }
-  }
-  if (!hasPlayer()) throw new HttpError(404, `Player video untuk '${slug}' tidak ditemukan di ${LK_NAME}.`);
-
-  const pageSlug = new URL(url).pathname.split("/").filter(Boolean)[0] || slug;
-  const info = $(".movie-info");
-  const rawTitle = clean(info.find("h1").first().text()) || clean($("h1").first().text());
-  const isEpisode = new URL(url).hostname.endsWith("nontondrama.vip") || $("body").attr("data-web_type") === "series";
-
-  const raw: { name: string; server: string; source: string }[] = [];
-  const seen = new Set<string>();
-  $("#player-list a").each((_, n) => {
-    const source = absUrl($(n).attr("data-url") || $(n).attr("href"), url);
-    if (!source || !/^https:/.test(source) || seen.has(source)) return;
-    seen.add(source);
-    const server = clean($(n).attr("data-server") || $(n).text()).toLowerCase();
-    raw.push({ name: clean($(n).text()) || server.toUpperCase(), server, source });
-  });
-  if (!raw.length) {
-    const source = absUrl($("#main-player").attr("src"), url);
-    if (source) raw.push({ name: "P2P", server: "p2p", source: source.replace(/\?.*$/, "") });
-  }
-
-  const servers: LkServer[] = await Promise.all(
-    raw.slice(0, 8).map(async (r, i) => {
-      const resolved = await lkResolve(r.source);
-      if (!resolved) return { no: i + 1, ...r, url: null, embeddable: false, note: "Alamat player tidak berhasil diambil dari server ini." };
-      return { no: i + 1, name: r.name, server: r.server, url: resolved, ...(await lkInspect(resolved, `${new URL(r.source).origin}/`)), source: r.source };
-    }),
-  );
-
-  // Serial induk + posisi episode.
-  const seriesLink = info.find(".detail p").filter((_, n) => /^series/i.test(clean($(n).find("span").first().text()))).find("a[href]").first();
-  const seriesRef = lkRef(seriesLink.attr("href"), url);
-  const series: { title: string; slug: string } | null = seriesRef ? { title: splitYear(clean(seriesLink.text())).title, slug: seriesRef.slug } : null;
-  const cur = seasons.flatMap((se) => se.episodes.map((e) => ({ season: se.season, ...e }))).find((e) => e.slug === pageSlug) ?? null;
-  const sm = /-season-(\d+)-episode-(\d+)/.exec(pageSlug);
-  const seasonNo = cur?.season ?? (sm ? Number(sm[1]) : null);
-  const episodeNo = cur?.episode ?? (sm ? Number(sm[2]) : null);
-  const list = seasons.find((se) => se.season === seasonNo)?.episodes ?? [];
-  const at = list.findIndex((e) => e.slug === pageSlug);
-
-  // Navigasi episode: dari daftar season, atau dari tombol EPS di bawah player.
-  const nav = (dir: "left" | "right"): string | null => {
-    const a = $(`.player-action .action-right a[href]`).filter((_, n) => $(n).find(`.fa-angle-double-${dir}`).length > 0).first();
-    return lkRef(a.attr("href"), url)?.slug ?? null;
-  };
-  const prev = at >= 0 ? (at > 0 ? list[at - 1].slug : null) : nav("left");
-  const next = at >= 0 ? (at < list.length - 1 ? list[at + 1].slug : null) : nav("right");
-
-  const download = absUrl($('.movie-action a[title^="Download"], .movie-action a[href*="dadadidi"]').first().attr("href"), url);
-  const named = splitYear(rawTitle);
-
-  return {
-    title: named.title,
-    slug: pageSlug,
-    type: isEpisode ? ("episode" as const) : ("movie" as const),
-    year: named.year,
-    series,
-    season: isEpisode ? seasonNo : null,
-    episode: isEpisode ? episodeNo : null,
-    quality: info.find(".info-tag span").toArray().map((n) => clean($(n).text())).find((t) => /^(hd|sd|cam|hdcam|ts|hdts|web-?dl|webrip|bluray|hdrip|dvdrip)$/i.test(t)) || null,
-    poster: lkPoster(info.find(".detail").first(), url),
-    servers,
-    download,
-    prev,
-    next,
-    seasons: seasons.map((se) => ({ season: se.season, total: se.total })),
-    episodes: list.map((e) => ({ episode: e.episode, slug: e.slug })),
-    url,
-  };
-}
-
-function lkWatchParams(sp: URLSearchParams) {
-  const slug = lkSlugParam(sp);
-  const season = opt(sp, "season") ? Math.floor(num(sp, "season", 1, 1, 200)) : null;
-  const episode = opt(sp, "episode") ? Math.floor(num(sp, "episode", 1, 1, 5000)) : null;
-  return { slug, season, episode };
-}
-
-/** Server yang dipakai bila pengguna tidak memilih: yang pasti bisa dibingkai, lalu yang belum sempat diperiksa. */
-const lkBestServer = (servers: LkServer[]) => servers.find((s) => s.url && s.embeddable === true) ?? servers.find((s) => s.url && s.embeddable === null) ?? null;
-
-function lkEmbedHtml(title: string, url: string): string {
-  return `<!doctype html>
-<html lang="id">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex">
-<meta name="referrer" content="no-referrer">
-<title>${escapeHtml(title)}</title>
-<style>html,body{margin:0;height:100%;background:#000;overflow:hidden}iframe{position:fixed;inset:0;width:100%;height:100%;border:0}.sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}</style>
-</head>
-<body>
-<div class="sr"><h1>${escapeHtml(title)}</h1><p>Player video: <a href="${escapeHtml(url)}" rel="noreferrer">${escapeHtml(url)}</a></p></div>
-<iframe src="${escapeHtml(url)}" title="${escapeHtml(title)}" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; screen-wake-lock" allowfullscreen></iframe>
-</body>
-</html>`;
 }
 
 const LK_SORT: Record<string, { path: string; label: string }> = {
@@ -551,13 +353,9 @@ const lkEndpoints: Endpoint[] = [
   {
     category: "film", slug: "lk21-detail", kind: "json",
     title: "LK21: Detail Film / Serial",
-    description: "Detail lengkap satu judul LK21: sinopsis, rating, genre, negara, durasi, sutradara, pemeran, trailer, judul terkait, dan untuk serial daftar episode tiap season. Slug judul maupun slug episodenya bisa diteruskan ke film/lk21-player untuk videonya. Slug didapat dari endpoint daftar atau search/lk21.",
+    description: "Detail lengkap satu judul LK21: sinopsis, rating, genre, negara, durasi, sutradara, pemeran, trailer, judul terkait, dan untuk serial daftar episode tiap season. Slug didapat dari endpoint daftar atau search/lk21.",
     params: [{ name: "slug", required: true, description: "Slug judul atau URL halaman LK21.", example: "avatar-2009" }],
-    handler: async ({ sp, origin }) => {
-      const d = await lkDetail(lkSlugParam(sp));
-      const q = `slug=${encodeURIComponent(d.slug)}`;
-      return { source: LK, ...d, player: `${origin}/api/film/lk21-player?${q}`, embed: `${origin}/api/film/lk21-embed?${q}` };
-    },
+    handler: async ({ sp }) => ({ source: LK, ...(await lkDetail(lkSlugParam(sp))) }),
   },
   {
     category: "film", slug: "lk21-pemeran", kind: "json",
@@ -604,90 +402,6 @@ const lkEndpoints: Endpoint[] = [
       return { source: LK, peran, slug, name, page: r.page, total_pages: r.total_pages, total: r.total, items: r.items };
     },
   },
-  {
-    category: "film", slug: "lk21-player", kind: "json",
-    title: "LK21: Player Film / Episode",
-    description: "Daftar server player video untuk satu film atau satu episode serial LK21, lengkap dengan alamat yang bisa dijadikan src <iframe>, link unduhan, dan navigasi episode. Untuk serial, isi slug serial ditambah season dan episode, atau langsung slug episodenya. Tiap server ditandai apakah bisa dipasang di situs lain.",
-    params: [
-      { name: "slug", required: true, description: "Slug film, slug serial, slug episode, atau URL halaman LK21.", example: "avatar-2009" },
-      { name: "season", description: "Nomor season (khusus serial). Default season pertama.", example: "1" },
-      { name: "episode", description: "Nomor episode (khusus serial). Default episode pertama.", example: "1" },
-    ],
-    handler: async ({ sp, origin }) => {
-      const p = lkWatchParams(sp);
-      const w = await lkWatch(p.slug, p.season, p.episode);
-      const embedOf = (slug: string, server?: string) => `${origin}/api/film/lk21-embed?slug=${encodeURIComponent(slug)}${server ? `&server=${encodeURIComponent(server)}` : ""}`;
-      const playerOf = (slug: string | null) => (slug ? { slug, player: `${origin}/api/film/lk21-player?slug=${encodeURIComponent(slug)}`, embed: embedOf(slug) } : null);
-      const best = lkBestServer(w.servers);
-      return {
-        source: LK,
-        title: w.title,
-        slug: w.slug,
-        type: w.type,
-        year: w.year,
-        series: w.series,
-        season: w.season,
-        episode: w.episode,
-        quality: w.quality,
-        poster: w.poster,
-        embed: best ? embedOf(w.slug) : null,
-        default_server: best?.server ?? null,
-        total_servers: w.servers.length,
-        servers: w.servers.map((s) => ({
-          no: s.no,
-          name: s.name,
-          server: s.server,
-          url: s.url,
-          embeddable: s.embeddable,
-          note: s.note,
-          embed: s.url && s.embeddable !== false ? embedOf(w.slug, s.server) : null,
-          source: s.source,
-        })),
-        download: w.download,
-        prev: playerOf(w.prev),
-        next: playerOf(w.next),
-        ...(w.type === "episode" ? { seasons: w.seasons, total_episodes: w.episodes.length, episodes: w.episodes } : {}),
-        url: w.url,
-      };
-    },
-  },
-  {
-    category: "film", slug: "lk21-embed", kind: "html",
-    title: "LK21: Embed Player",
-    description: "Halaman HTML berisi player video film atau episode LK21, layar penuh. Pakai URL ini langsung sebagai src <iframe> di situsmu. Tanpa parameter server, dipilih server pertama yang bisa dipasang di situs lain.",
-    params: [
-      { name: "slug", required: true, description: "Slug film, slug serial, slug episode, atau URL halaman LK21.", example: "avatar-2009" },
-      { name: "season", description: "Nomor season (khusus serial). Default season pertama.", example: "1" },
-      { name: "episode", description: "Nomor episode (khusus serial). Default episode pertama.", example: "1" },
-      { name: "server", description: "Nama server (cast, hydrax, p2p) atau nomornya dari film/lk21-player. Default: otomatis.", example: "cast" },
-    ],
-    handler: async ({ sp }) => {
-      const p = lkWatchParams(sp);
-      const want = opt(sp, "server").toLowerCase();
-      if (want && !/^[a-z0-9_-]{1,20}$/.test(want)) throw new HttpError(400, "Parameter 'server' diisi nama server (cast, hydrax, p2p) atau nomornya.");
-      const w = await lkWatch(p.slug, p.season, p.episode);
-      const usable = w.servers.filter((s) => s.url && s.embeddable !== false).map((s) => s.server);
-      const hint = usable.length ? ` Server yang bisa dipakai: ${usable.join(", ")}.` : " Tidak ada server lain yang bisa dipasang di luar LK21 untuk judul ini.";
-      let server: LkServer | null;
-      if (want) {
-        server = w.servers.find((s) => s.server === want || String(s.no) === want) ?? null;
-        if (!server) throw new HttpError(404, `Server '${want}' tidak ada. Pilihan: ${w.servers.map((s) => s.server).join(", ")}.`);
-        if (!server.url || server.embeddable === false) throw new HttpError(404, `Server '${server.server}' tidak bisa dipakai: ${server.note || "alamat player tidak tersedia."}${hint}`);
-      } else {
-        server = lkBestServer(w.servers);
-        if (!server) throw new HttpError(404, `Tidak ada server player '${w.title}' yang bisa dipasang di luar situs LK21.`);
-      }
-      const label = w.type === "episode" && w.season !== null && w.episode !== null ? `${w.series?.title ?? w.title} S${w.season} E${w.episode}` : w.title;
-      return new Response(lkEmbedHtml(label, server.url as string), {
-        headers: {
-          "content-type": "text/html; charset=utf-8",
-          "cache-control": "public, max-age=300, s-maxage=600",
-          "content-security-policy": "default-src 'none'; frame-src https:; style-src 'unsafe-inline'; frame-ancestors *",
-          "x-robots-tag": "noindex",
-        },
-      });
-    },
-  },
 ];
 
-export const filmEndpoints: Endpoint[] = [...lkEndpoints];
+export const filmEndpoints: Endpoint[] = [...sankaEndpoints, ...lkEndpoints];

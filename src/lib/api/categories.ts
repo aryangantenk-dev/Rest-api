@@ -103,9 +103,9 @@ export const categories: Category[] = [
   {
     id: "film",
     name: "Film",
-    tagline: "LK21, pemeran & player",
-    description: "Scraper film LK21 (Layarkaca21): beranda, daftar film, genre, detail film dan serial, daftar pemeran, film per pemeran, serta player video film dan episode serial. Berjalan lewat server perantara (VPS) milik pemilik API.",
-    seoTitle: "REST API Film: Scraper LK21, Detail Film & Daftar Pemeran",
+    tagline: "Sankanime, LK21 & player",
+    description: "Data film dan serial dari Sankanime Movies: pencarian, trending, detail lengkap dengan pemeran, daftar episode, player video siap pasang, link stream dan unduhan. Ditambah scraper LK21 (Layarkaca21) untuk beranda, daftar, genre, detail, dan pemeran.",
+    seoTitle: "REST API Film: Sankanime & LK21, Player Video, Detail & Pemeran",
   },
 ];
 

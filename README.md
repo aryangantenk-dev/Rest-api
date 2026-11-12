@@ -1,6 +1,6 @@
 # Yanxz API
 
-REST API gratis tanpa API key (139 endpoint) beserta dokumentasi dan playground interaktif. Dibangun dengan Next.js 16 (App Router).
+REST API gratis tanpa API key (150 endpoint) beserta dokumentasi dan playground interaktif. Dibangun dengan Next.js 16 (App Router).
 
 ## Menjalankan lokal
 
@@ -121,7 +121,49 @@ Contoh memasang player di halaman sendiri:
 
 Kedua scraper membaca HTML situs sumber, jadi bisa berhenti bekerja kalau situs tersebut mengubah tampilannya atau memblokir IP server.
 
-## Scraper Film (LK21)
+## Film (Sankanime & LK21)
+
+Kategori Film punya dua sumber. **Sankanime Movies** membawa data film dan serial berbasis TMDB lengkap dengan pemeran, player video, link stream, dan unduhan. **LK21** hanya menyediakan daftar dan detail judul.
+
+### Sankanime
+
+| Endpoint | Keterangan |
+| --- | --- |
+| `/api/film/sanka-home` | Beranda: film sedang tayang, populer, rating tertinggi, segera tayang, dan serial terbaru/populer. |
+| `/api/film/sanka-search?q=…&page=` | Cari film dan serial berdasarkan judul. |
+| `/api/film/sanka-trending?tipe=&periode=&page=` | Trending `day` atau `week` untuk `tipe=movie` atau `tipe=tv`. |
+| `/api/film/sanka-list?tipe=&urut=&genre=&tahun=&bahasa=&page=` | Daftar dengan saringan. `urut`: `populer`, `rating`, `terbaru`. |
+| `/api/film/sanka-genre` | Daftar genre film dan serial beserta id-nya. |
+| `/api/film/sanka-jadwal?page=` | Serial yang punya episode tayang hari ini. |
+| `/api/film/sanka-detail?id=…&tipe=` | Detail lengkap: sinopsis, genre, sutradara, pemeran (nama tokoh dan foto), trailer, daftar season, rekomendasi. |
+| `/api/film/sanka-season?id=…&season=` | Daftar episode satu season sebuah serial. |
+| `/api/film/sanka-artis?id=…` | Profil seorang pemeran atau sutradara beserta daftar film dan serialnya. |
+| `/api/film/sanka-player?id=…&tipe=&season=&episode=` | Daftar server player sebuah film atau episode, dengan tanda bisa-tidaknya dipasang di situs lain dan navigasi episode. |
+| `/api/film/sanka-embed?id=…&tipe=&season=&episode=&server=&nav=` | Halaman HTML berisi player, siap dipakai sebagai `src` iframe. Ada tombol ganti server dan episode; `nav=0` menyembunyikannya. |
+| `/api/film/sanka-stream?id=…&tipe=&season=&episode=` | Link stream langsung (HLS `.m3u8`), header yang dibutuhkan, dan daftar subtitle. |
+| `/api/film/sanka-download?id=…&tipe=&season=&episode=` | Link unduhan beserta resolusi dan ukuran. |
+
+`id` adalah id TMDB (`19995`) atau slug Sankanime (`avatar-19995`); `tipe` adalah `movie` (default) atau `tv`, sesuai field `type` pada hasil pencarian.
+
+Contoh memasang player film dan episode serial:
+
+```html
+<iframe src="https://domainmu/api/film/sanka-embed?id=19995"
+        width="100%" style="aspect-ratio:16/9;border:0" allowfullscreen></iframe>
+<iframe src="https://domainmu/api/film/sanka-embed?id=284833&tipe=tv&season=1&episode=3"
+        width="100%" style="aspect-ratio:16/9;border:0" allowfullscreen></iframe>
+```
+
+Player berasal dari penyedia pihak ketiga dan bisa memuat iklan; kalau satu server tidak memutar, ganti server lewat tombol di bawah player. Link dari `sanka-stream` umumnya hanya mau diputar bila permintaannya membawa header `Referer`/`Origin` yang tercantum di jawabannya, jadi cocok untuk aplikasi atau bot, bukan untuk tag `<video>` biasa.
+
+API Sankanime menolak IP server Vercel, jadi dipanggil lewat Supabase Edge Function:
+
+1. Deploy `supabase/functions/film-proxy` ke proyek Supabase dengan verifikasi JWT dimatikan (`supabase functions deploy film-proxy --no-verify-jwt`), lalu isi secret `FILM_PROXY_KEY` dengan kunci acak (`supabase secrets set FILM_PROXY_KEY=…`).
+2. Isi env `SANKA_PROXY_URL` (`https://<ref>.supabase.co/functions/v1/film-proxy`) dan `SANKA_PROXY_KEY` (kunci yang sama) di hosting, lalu deploy ulang.
+
+API sumbernya membatasi 45 permintaan per menit, jadi jawaban disimpan sekitar lima menit di memori server dan panggilan keluar dibatasi; saat padat endpoint menjawab 429.
+
+### LK21
 
 | Endpoint | Keterangan |
 | --- | --- |
@@ -131,24 +173,13 @@ Kedua scraper membaca HTML situs sumber, jadi bisa berhenti bekerja kalau situs 
 | `/api/film/lk21-detail?slug=…` | Detail film atau serial: sinopsis, rating, genre, negara, sutradara, pemeran, trailer, film terkait, dan daftar episode untuk serial. |
 | `/api/film/lk21-pemeran?slug=…` | Daftar pemeran dan sutradara sebuah judul, lengkap dengan tautan ke daftar film tiap orang. |
 | `/api/film/lk21-artis?slug=…&peran=&page=` | Semua film seorang pemeran (`peran=artis`) atau sutradara (`peran=sutradara`). |
-| `/api/film/lk21-player?slug=…&season=&episode=` | Server player video sebuah film atau episode serial: alamat player untuk `<iframe>`, tanda bisa/tidaknya dipasang di situs lain, link unduhan, dan navigasi episode. |
-| `/api/film/lk21-embed?slug=…&season=&episode=&server=` | Halaman HTML berisi player, untuk dipakai langsung sebagai `src` iframe. |
 | `/api/search/lk21?q=…&page=&tipe=` | Cari judul di LK21 (`tipe`: `movie` atau `series`). Tidak butuh server perantara. |
 
-Contoh memasang player film dan episode serial:
+LK21 tidak punya endpoint player: player videonya menolak diputar di luar situs LK21. Pakai endpoint Sankanime untuk memutar video.
 
-```html
-<iframe src="https://domainmu/api/film/lk21-embed?slug=avatar-2009"
-        width="100%" style="aspect-ratio:16/9;border:0" allowfullscreen></iframe>
-<iframe src="https://domainmu/api/film/lk21-embed?slug=avatar-seven-havens-2026&season=1&episode=3"
-        width="100%" style="aspect-ratio:16/9;border:0" allowfullscreen></iframe>
-```
-
-Tidak semua server bisa dipakai di luar LK21: server `p2p` hanya mau diputar di dalam situs LK21 (ditandai `embeddable: false`), jadi embed otomatis memilih server lain seperti `cast` atau `hydrax`. Player berasal dari pihak ketiga dan bisa memuat iklan.
-
-LK21 menolak IP server Vercel, jadi endpoint `/api/film/*` dititipkan lewat server perantara ("film-proxy") di VPS milik sendiri:
+LK21 menolak IP server Vercel dan IP Supabase, jadi endpoint `lk21-*` dititipkan lewat server perantara ("film-proxy") di VPS milik sendiri:
 
 1. Di VPS Ubuntu, jalankan `scripts/film-proxy/install.sh` sebagai root (tambahkan `TUNNEL=1` bila port VPS tidak bisa dijangkau dari luar). Skrip mengetes dulu apakah IP VPS diterima, lalu memasang layanan `film-proxy` dan mencetak `PROXY_URL` serta `PROXY_KEY`.
 2. Isi env `FILM_PROXY_URL` dan `FILM_PROXY_KEY` di hosting dengan dua nilai itu, lalu deploy ulang.
 
-Tanpa kedua env itu endpoint film menjawab 503, dan menjawab 502 selama VPS mati. Pada mode terowongan alamatnya berganti setiap layanan dinyalakan ulang, jadi `FILM_PROXY_URL` harus ikut diperbarui.
+Tanpa kedua env itu endpoint `lk21-*` menjawab 503, dan menjawab 502 selama VPS mati. Pada mode terowongan alamatnya berganti setiap layanan dinyalakan ulang, jadi `FILM_PROXY_URL` harus ikut diperbarui.
