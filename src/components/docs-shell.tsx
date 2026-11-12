@@ -4,10 +4,9 @@ import { allMeta } from "@/lib/api/registry";
 import type { CategoryId } from "@/lib/api/types";
 import { SITE_NAME, SITE_URL } from "@/lib/site";
 import { RATE_LIMIT } from "@/lib/limits";
-import { CategorySelect } from "./category-select";
+import { CategoryMenu } from "./category-menu";
 import { BaseUrlBox } from "./client-utils";
 import { DocsExplorer } from "./docs-explorer";
-import { CategoryIcon } from "./icons";
 
 const facts = [
   ["Metode", "GET"],
@@ -23,43 +22,18 @@ export function DocsShell({ active }: { active?: CategoryId }) {
   const current = active ? categoryById[active] : null;
   const count = (id: CategoryId) => all.filter((e) => e.category === id).length;
 
-  const navItem = (on: boolean) =>
-    `relative flex min-h-10 items-center gap-3 px-3 text-[0.9375rem] transition-colors duration-150 ${on ? "bg-subtle font-semibold text-fg" : "text-muted hover:bg-subtle hover:text-fg"}`;
+  const menu = [
+    { href: "/docs", name: "Semua endpoint", count: all.length },
+    ...categories.map((c) => ({ href: `/docs/${c.id}`, name: c.name, count: count(c.id) })),
+  ];
+  const activeHref = active ? `/docs/${active}` : "/docs";
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6 lg:pt-12">
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-12">
-        {/* navigasi kategori: daftar di layar lebar, pemilih bawaan di layar kecil */}
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[18rem_minmax(0,1fr)] lg:gap-12">
+        {/* menu filter kategori: selalu terlihat di layar lebar, dilipat di layar kecil */}
         <aside className="min-w-0 lg:sticky lg:top-[calc(var(--header-h)+1.5rem)] lg:max-h-[calc(100dvh-var(--header-h)-3rem)] lg:self-start lg:overflow-y-auto">
-          <CategorySelect
-            value={active ? `/docs/${active}` : "/docs"}
-            options={[{ value: "/docs", label: `Semua endpoint (${all.length})` }, ...categories.map((c) => ({ value: `/docs/${c.id}`, label: `${c.name} (${count(c.id)})` }))]}
-          />
-          <nav aria-label="Kategori dokumentasi" className="hidden lg:block">
-            <h2 className="px-3 text-sm font-semibold">Kategori</h2>
-            <ul className="mt-2">
-              <li>
-                <Link href="/docs" aria-current={!active ? "page" : undefined} className={navItem(!active)}>
-                  {!active && <span className="absolute inset-y-0 left-0 w-0.5 bg-accent" aria-hidden />}
-                  <span className="flex-1">Semua endpoint</span>
-                  <span className="tnum font-mono text-sm font-normal text-muted">{all.length}</span>
-                </Link>
-              </li>
-              {categories.map((c) => {
-                const on = active === c.id;
-                return (
-                  <li key={c.id}>
-                    <Link href={`/docs/${c.id}`} aria-current={on ? "page" : undefined} className={navItem(on)}>
-                      {on && <span className="absolute inset-y-0 left-0 w-0.5 bg-accent" aria-hidden />}
-                      <CategoryIcon id={c.id} className="h-5 w-5 shrink-0" />
-                      <span className="flex-1">{c.name}</span>
-                      <span className="tnum font-mono text-sm font-normal text-muted">{count(c.id)}</span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </nav>
+          <CategoryMenu key={activeHref} items={menu} active={activeHref} />
         </aside>
 
         {/* konten */}

@@ -34,6 +34,15 @@
   --code-ok: #4ade80;
   --code-danger: #f87171;
 
+  /* Menu filter kategori: selalu gelap dengan palet abu hangat, di kedua tema. */
+  --menu: #1e1a1a;
+  --menu-line: #332e2e;
+  --menu-fg: #f5f5f5;
+  --menu-hover: #262121;
+  --menu-active: #2c2727;
+  --menu-radio: #b0a8a8;
+  --menu-accent: #f28b82;
+
   /* Token gerak: dipilih menurut jarak dan peran, bukan satu durasi untuk semua. */
   --dur-press: 100ms;
   --dur-fast: 150ms;
@@ -279,6 +288,98 @@ select {
   .panel[data-open="true"] {
     opacity: 0;
     transform: translateY(-0.375rem);
+  }
+}
+
+/* ---------- Menu filter kategori ----------
+   Daftar vertikal selebar wadahnya. Seluruh baris bisa diklik; lingkaran di kanan
+   hanya penanda pilihan. */
+.cat-menu {
+  background: var(--menu);
+  color: var(--menu-fg);
+}
+.cat-heading,
+.cat-label {
+  color: var(--menu-radio);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.cat-heading {
+  padding: 0.875rem 1.25rem;
+  border-bottom: 1px solid var(--menu-line);
+}
+.cat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 3.5rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--menu-line);
+  color: var(--menu-fg);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.cat-row:hover {
+  background: var(--menu-hover);
+}
+.cat-row[data-selected="true"] {
+  background: var(--menu-active);
+}
+/* Cincin fokus digambar di dalam baris dan memakai warna teks menu, karena warna
+   cincin situs tidak terlihat di atas latar gelap ini. */
+.cat-row:focus-visible {
+  outline: 2px solid var(--menu-fg);
+  outline-offset: -2px;
+}
+.cat-list > li:last-child > .cat-row,
+button.cat-row[aria-expanded="false"] {
+  border-bottom-color: transparent;
+}
+.cat-radio {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid var(--menu-radio);
+  border-radius: 9999px;
+  transition: all 0.2s ease;
+}
+.cat-radio::after {
+  content: "";
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 9999px;
+  background: var(--menu-accent);
+  opacity: 0;
+  transform: scale(0);
+  transition: all 0.2s ease;
+}
+.cat-row[data-selected="true"] .cat-radio {
+  border-color: var(--menu-accent);
+}
+.cat-row[data-selected="true"] .cat-radio::after {
+  opacity: 1;
+  transform: none;
+}
+/* Di layar lebar daftarnya selalu terbuka; tombol lipat hanya ada di layar kecil. */
+@media (min-width: 64rem) {
+  .cat-list.panel {
+    display: block;
+    opacity: 1;
+    transform: none;
+  }
+  /* Disembunyikan di sini, bukan lewat utility: aturan `.cat-row` di atas tidak
+     berada di dalam layer, jadi `lg:hidden` akan kalah darinya. */
+  button.cat-row {
+    display: none;
   }
 }
 
