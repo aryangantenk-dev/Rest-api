@@ -32,29 +32,30 @@ export function CodeTabs({ fallback, path }: Props) {
 
   return (
     <div className="bg-code text-codefg">
-      <div className="flex items-stretch justify-between border-b border-codeline">
-        <div role="tablist" aria-label="Bahasa pemrograman" className="flex min-w-0 flex-wrap">
-          {tabs.map((t) => (
-            <button
-              key={t}
-              type="button"
-              role="tab"
-              id={`tab-${t}`}
-              aria-selected={tab === t}
-              aria-controls="panel-kode"
-              onClick={() => setTab(t)}
-              className={`relative min-h-11 px-3 text-sm font-medium transition-colors duration-150 sm:px-4 ${tab === t ? "text-codefg" : "text-codemuted hover:text-codefg"}`}
-            >
-              {t}
-              {tab === t && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-accent" aria-hidden />}
-            </button>
-          ))}
-        </div>
-        <CopyButton text={snippets[tab]} tone="code" />
+      <div role="tablist" aria-label="Bahasa pemrograman" className="flex flex-wrap border-b border-codeline">
+        {tabs.map((t) => (
+          <button
+            key={t}
+            type="button"
+            role="tab"
+            id={`tab-${t}`}
+            aria-selected={tab === t}
+            aria-controls="panel-kode"
+            onClick={() => setTab(t)}
+            className={`relative min-h-11 px-3 text-sm font-medium transition-colors duration-150 sm:px-4 ${tab === t ? "text-codefg" : "text-codemuted hover:text-codefg"}`}
+          >
+            {t}
+            {tab === t && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-accent" aria-hidden />}
+          </button>
+        ))}
       </div>
-      <pre id="panel-kode" role="tabpanel" aria-labelledby={`tab-${tab}`} tabIndex={0} key={tab} className="enter overflow-x-auto p-4 font-mono text-sm leading-relaxed">
-        <code>{snippets[tab]}</code>
-      </pre>
+      {/* Tombol salin berada di samping kode, bukan di baris tab, supaya tab tidak terlipat di layar sempit. */}
+      <div className="flex items-start">
+        <pre id="panel-kode" role="tabpanel" aria-labelledby={`tab-${tab}`} tabIndex={0} key={tab} className="enter min-w-0 flex-1 overflow-x-auto p-4 font-mono text-sm leading-relaxed">
+          <code>{snippets[tab]}</code>
+        </pre>
+        <CopyButton text={snippets[tab]} tone="code" className="mt-1" />
+      </div>
     </div>
   );
 }
