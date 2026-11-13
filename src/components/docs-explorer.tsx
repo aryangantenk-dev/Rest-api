@@ -5,7 +5,7 @@ import type { EndpointMeta } from "@/lib/api/types";
 import type { Category } from "@/lib/api/categories";
 import { colorizeJson } from "@/lib/highlight";
 import { buildSnippets } from "./code-tabs";
-import { CopyButton, useOrigin } from "./client-utils";
+import { CopyButton, LoadedImage, REDIRECT_FAILED, asksRedirect, loadImage, useOrigin } from "./client-utils";
 import { CategoryIcon, ChevronIcon, PlayIcon, SearchIcon } from "./icons";
 
 type Result = {
@@ -15,6 +15,8 @@ type Result = {
   type: string;
   text?: string;
   img?: string;
+  /** Gambar yang dimuat lewat pengalihan (redirect=1). */
+  el?: HTMLImageElement;
   video?: string;
   frame?: string;
   size?: number;
@@ -81,13 +83,30 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
     setLoading(true);
     setTab("respons");
     const t0 = performance.now();
-    try {
-      const r = await fetch(`${e.path}${query}`);
-      const type = r.headers.get("content-type") ?? "";
-      const ms = Math.round(performance.now() - t0);
+    const url = `${e.path}${query}`;
+    const forget = () => {
       if (imgRef.current) {
         URL.revokeObjectURL(imgRef.current);
         imgRef.current = null;
+      }
+    };
+    try {
+      if (asksRedirect(url)) {
+        const el = await loadImage(url, `Hasil ${e.title}`, "max-h-80 max-w-full border border-codeline bg-white/5");
+        if (el) {
+          forget();
+          setRes({ ok: true, status: 302, ms: Math.round(performance.now() - t0), type: "", el });
+          return;
+        }
+        // Gambar tidak termuat: ambil jawaban API-nya supaya pesan galatnya bisa ditampilkan.
+      }
+      const r = await fetch(url, { redirect: "manual" });
+      const type = r.headers.get("content-type") ?? "";
+      const ms = Math.round(performance.now() - t0);
+      forget();
+      if (r.type === "opaqueredirect") {
+        setRes({ ok: false, status: 302, ms, type: "", error: REDIRECT_FAILED });
+        return;
       }
       if (type.startsWith("image/") || type.startsWith("video/")) {
         const blob = await r.blob();
@@ -102,7 +121,7 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
         } catch {
           /* bukan JSON */
         }
-        const frame = r.ok && type.startsWith("text/html") ? `${e.path}${query}` : undefined;
+        const frame = r.ok && type.startsWith("text/html") ? url : undefined;
         setRes({ ok: r.ok, status: r.status, ms, type, text, frame, size: raw.length });
       }
     } catch {
@@ -301,6 +320,13 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
                   <p className="font-sans text-base text-codemuted">Respons muncul di sini setelah kamu menekan &ldquo;Kirim permintaan&rdquo;.</p>
                 ) : res.error ? (
                   <p className="enter font-sans text-base text-codedanger">{res.error}</p>
+                ) : res.el ? (
+                  <div>
+                    <LoadedImage el={res.el} />
+                    <p className="tnum mt-3 text-codemuted">
+                      Dialihkan ke berkas gambar · {res.el.naturalWidth} × {res.el.naturalHeight} px
+                    </p>
+                  </div>
                 ) : res.img ? (
                   <div className="enter">
                     {/* eslint-disable-next-line @next/next/no-img-element */}

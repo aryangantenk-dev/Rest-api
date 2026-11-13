@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { colorizeJson } from "@/lib/highlight";
-import { CopyButton, useOrigin } from "./client-utils";
+import { CopyButton, LoadedImage, REDIRECT_FAILED, asksRedirect, loadImage, useOrigin } from "./client-utils";
 import { PlayIcon } from "./icons";
 
 export type ConsoleEndpoint = {
@@ -18,6 +18,7 @@ type Result =
   | { kind: "image"; status: number; ok: boolean; ms: number; type: string; src: string }
   | { kind: "video"; status: number; ok: boolean; ms: number; type: string; src: string }
   | { kind: "html"; status: number; ok: boolean; ms: number; type: string; href: string }
+  | { kind: "redirect"; status: number; ok: boolean; ms: number; type: string; el: HTMLImageElement }
   | { kind: "error"; message: string };
 
 const MAX_CHARS = 20000;
@@ -27,7 +28,14 @@ const MAX_SUGGEST = 7;
 async function request(target: string, signal: AbortSignal): Promise<Result | null> {
   const t0 = performance.now();
   try {
-    const r = await fetch(`/api/${target}`, { signal });
+    if (asksRedirect(target)) {
+      const el = await loadImage(`/api/${target}`, "Gambar hasil permintaan", "max-h-72 max-w-full border border-codeline", signal);
+      if (signal.aborted) return null;
+      if (el) return { kind: "redirect", status: 302, ok: true, ms: Math.round(performance.now() - t0), type: "dialihkan ke berkas gambar", el };
+      // Gambar tidak termuat: ambil jawaban API-nya supaya pesan galatnya bisa ditampilkan.
+    }
+    const r = await fetch(`/api/${target}`, { signal, redirect: "manual" });
+    if (r.type === "opaqueredirect") return { kind: "error", message: REDIRECT_FAILED };
     const type = (r.headers.get("content-type") ?? "").split(";")[0];
     const ms = Math.round(performance.now() - t0);
     if (type.startsWith("image/") || type.startsWith("video/")) {
@@ -265,6 +273,8 @@ export function TryConsole({ endpoints, picks, fallback, sample }: { endpoints: 
           ) : res.kind === "image" ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={res.src} alt="Gambar hasil permintaan" className="enter max-h-full max-w-full border border-codeline" />
+          ) : res.kind === "redirect" ? (
+            <LoadedImage el={res.el} />
           ) : res.kind === "video" ? (
             <video src={res.src} controls playsInline aria-label="Video hasil permintaan" className="enter max-h-full max-w-full border border-codeline bg-black" />
           ) : res.kind === "html" ? (
