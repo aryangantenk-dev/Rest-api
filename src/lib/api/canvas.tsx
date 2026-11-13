@@ -1170,7 +1170,7 @@ export const canvasEndpoints: Endpoint[] = [
     title: "Meme Generator",
     description: "Tempel teks atas dan bawah bergaya meme klasik di atas gambar apa pun. Hasil PNG 600×600.",
     params: [
-      { name: "image", required: true, description: "URL gambar (JPG/PNG).", example: "https://picsum.photos/600" },
+      { name: "image", required: true, description: "URL gambar (JPG/PNG).", example: "https://github.com/github.png" },
       { name: "top", description: "Teks atas.", example: "ketika deploy hari jumat" },
       { name: "bottom", description: "Teks bawah.", example: "dan langsung error" },
     ],
