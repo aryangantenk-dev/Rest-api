@@ -13,7 +13,7 @@ import { canvasEndpoints } from "./canvas";
 import { searchEndpoints } from "./search";
 import { downloaderEndpoints } from "./downloader";
 import { gamesEndpoints } from "./games";
-import { xavrelsEndpoints } from "./xavrels";
+import { mediaToolEndpoints } from "./mediatools";
 import { categories } from "./categories";
 
 export const endpoints: Endpoint[] = [
@@ -32,7 +32,7 @@ export const endpoints: Endpoint[] = [
   ...animeEndpoints,
   ...filmEndpoints,
   // Kategorinya beragam; urutan per kategori diatur ulang oleh allMeta().
-  ...xavrelsEndpoints,
+  ...mediaToolEndpoints,
 ];
 
 const index = new Map(endpoints.map((e) => [`${e.category}/${e.slug}`, e]));

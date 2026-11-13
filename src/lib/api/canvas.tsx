@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { ImageResponse } from "next/og";
+import { PNG } from "pngjs";
 import type { Endpoint } from "./types";
 import { HttpError } from "./types";
 import { binaryResponse, fetchRaw, need, normalizeHex, num, opt, parseHttpUrl } from "./helpers";
@@ -41,7 +42,7 @@ function loadFonts(): Promise<Font[]> {
   return fontsPromise;
 }
 
-async function render(node: ReactElement, width: number, height: number): Promise<Response> {
+async function renderBuffer(node: ReactElement, width: number, height: number): Promise<Buffer> {
   let buf: ArrayBuffer;
   try {
     const fonts = await loadFonts();
@@ -52,7 +53,118 @@ async function render(node: ReactElement, width: number, height: number): Promis
     throw new HttpError(500, "Gagal merender gambar. Periksa teks atau URL gambar yang dikirim.");
   }
   if (!buf.byteLength) throw new HttpError(500, "Gagal merender gambar. Periksa teks atau URL gambar yang dikirim (gunakan JPG/PNG).");
-  return binaryResponse(buf, "image/png", "public, max-age=86400");
+  return Buffer.from(buf);
+}
+
+async function render(node: ReactElement, width: number, height: number): Promise<Response> {
+  return binaryResponse(await renderBuffer(node, width, height), "image/png", "public, max-age=86400");
+}
+
+/* ------------------------------------------------------------------ */
+/* Brat (dipakai endpoint gambar dan video)                             */
+/* ------------------------------------------------------------------ */
+
+const BRAT_FPS = 10;
+const BRAT_MAX_STEPS = 40;
+
+const bratText = (sp: URLSearchParams) => cleanText(need(sp, "text", 250)).replace(/\s+/g, " ").trim().toLowerCase();
+
+function bratTheme(sp: URLSearchParams): [string, string] {
+  const tema = opt(sp, "tema", "putih").toLowerCase();
+  if (tema === "hijau" || tema === "green") return ["#8ace00", "#000000"];
+  if (tema === "hitam" || tema === "black") return ["#000000", "#ffffff"];
+  return ["#ffffff", "#000000"];
+}
+
+const BRAT_PAD = 26;
+const bratSize = (text: string) => fitFont(text, 512 - BRAT_PAD * 2, 512 - BRAT_PAD * 2, 0.46, 1.04, 230, 26);
+/** Kekuatan efek buram (deviasi standar, piksel) untuk ukuran huruf tertentu. */
+const bratBlur = (size: number) => Math.max(1.2, size / 60);
+
+function bratNode(text: string, [bg, fg]: [string, string], blur: boolean): ReactElement {
+  const pad = BRAT_PAD;
+  const size = bratSize(text);
+  const words = text.split(" ");
+  return (
+    <div style={{ ...fill, background: bg, padding: pad }}>
+      <div
+        style={{
+          ...fill,
+          flexWrap: "wrap",
+          alignContent: "space-between",
+          justifyContent: words.length > 1 ? "space-between" : "center",
+          alignItems: "center",
+          columnGap: size * 0.24,
+          fontFamily: "Narrow",
+          fontWeight: 500,
+          fontSize: size,
+          lineHeight: 1.04,
+          color: fg,
+          ...(blur ? { filter: `blur(${bratBlur(size).toFixed(1)}px)` } : {}),
+        }}
+      >
+        {words.map((w, i) => (
+          <div key={i} style={{ display: "flex" }}>
+            {w}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Buramkan piksel RGBA di tempat. Tiga kali rata-rata kotak mendekati buram Gaussian dengan deviasi `sigma`. */
+function blurRgba(data: Buffer, width: number, height: number, sigma: number): void {
+  const radius = Math.max(1, Math.round((Math.sqrt(4 * sigma * sigma + 1) - 1) / 2));
+  const win = radius * 2 + 1;
+  const line = new Float32Array(Math.max(width, height));
+  const pass = (count: number, length: number, start: (i: number) => number, stride: number) => {
+    for (let i = 0; i < count; i++) {
+      const base = start(i);
+      for (let c = 0; c < 3; c++) {
+        for (let k = 0; k < length; k++) line[k] = data[base + k * stride + c];
+        let sum = line[0] * (radius + 1);
+        for (let k = 1; k <= radius; k++) sum += line[Math.min(k, length - 1)];
+        for (let k = 0; k < length; k++) {
+          data[base + k * stride + c] = Math.round(sum / win);
+          sum += line[Math.min(k + radius + 1, length - 1)] - line[Math.max(k - radius, 0)];
+        }
+      }
+    }
+  };
+  for (let n = 0; n < 3; n++) {
+    pass(height, width, (y) => y * width * 4, 4);
+    pass(width, height, (x) => x * 4, width * 4);
+  }
+}
+
+/**
+ * Susun bingkai RGBA menjadi MP4 (H.264). Tiap bingkai ditahan `hold` kali, dan bingkai
+ * terakhir ditahan `tail` kali lagi supaya teks lengkapnya sempat terbaca.
+ */
+async function encodeMp4(frames: Buffer[], width: number, height: number, hold: number, tail: number): Promise<Buffer> {
+  const { createH264MP4Encoder } = await import("h264-mp4-encoder");
+  const enc = await createH264MP4Encoder();
+  try {
+    enc.width = width;
+    enc.height = height;
+    enc.frameRate = BRAT_FPS;
+    enc.quantizationParameter = 26;
+    enc.speed = 8;
+    enc.groupOfPictures = BRAT_FPS * 2;
+    enc.initialize();
+    frames.forEach((rgba, i) => {
+      const repeat = i === frames.length - 1 ? hold + tail : hold;
+      for (let r = 0; r < repeat; r++) enc.addFrameRgba(rgba);
+    });
+    enc.finalize();
+    return Buffer.from(enc.FS.readFile(enc.outputFilename));
+  } catch (e) {
+    console.error("[bratvid]", e);
+    throw new HttpError(500, "Gagal menyusun video. Coba lagi dengan teks yang lebih pendek.");
+  } finally {
+    enc.delete();
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -258,42 +370,36 @@ export const canvasEndpoints: Endpoint[] = [
       { name: "tema", description: "putih (default), hijau, atau hitam.", example: "putih" },
       { name: "blur", description: "false untuk mematikan efek buram.", example: "true" },
     ],
+    handler: async ({ sp }) => render(bratNode(bratText(sp), bratTheme(sp), opt(sp, "blur", "true") !== "false"), 512, 512),
+  },
+  {
+    category: "canvas", slug: "bratvid", kind: "video",
+    title: "Brat Video",
+    description: "Versi video dari stiker brat: teks muncul kata demi kata. Hasil MP4 512×512 tanpa suara.",
+    params: [
+      { name: "text", required: true, description: "Teks (maks 250 karakter).", example: "aku capek jadi orang baik" },
+      { name: "tema", description: "putih (default), hijau, atau hitam.", example: "putih" },
+      { name: "blur", description: "false untuk mematikan efek buram.", example: "true" },
+      { name: "jeda", description: "Jeda antar kata dalam milidetik, 200–1500. Default 500.", example: "500" },
+    ],
     handler: async ({ sp }) => {
-      const text = cleanText(need(sp, "text", 250)).replace(/\s+/g, " ").trim().toLowerCase();
-      const tema = opt(sp, "tema", "putih").toLowerCase();
-      const [bg, fg] = tema === "hijau" || tema === "green" ? ["#8ace00", "#000000"] : tema === "hitam" || tema === "black" ? ["#000000", "#ffffff"] : ["#ffffff", "#000000"];
+      const words = bratText(sp).split(" ");
+      const theme = bratTheme(sp);
       const blur = opt(sp, "blur", "true") !== "false";
-      const pad = 26;
-      const size = fitFont(text, 512 - pad * 2, 512 - pad * 2, 0.46, 1.04, 230, 26);
-      const words = text.split(" ");
-      return render(
-        <div style={{ ...fill, background: bg, padding: pad }}>
-          <div
-            style={{
-              ...fill,
-              flexWrap: "wrap",
-              alignContent: "space-between",
-              justifyContent: words.length > 1 ? "space-between" : "center",
-              alignItems: "center",
-              columnGap: size * 0.24,
-              fontFamily: "Narrow",
-              fontWeight: 500,
-              fontSize: size,
-              lineHeight: 1.04,
-              color: fg,
-              ...(blur ? { filter: `blur(${Math.max(1.2, size / 60).toFixed(1)}px)` } : {}),
-            }}
-          >
-            {words.map((w, i) => (
-              <div key={i} style={{ display: "flex" }}>
-                {w}
-              </div>
-            ))}
-          </div>
-        </div>,
-        512,
-        512,
-      );
+      const hold = Math.max(2, Math.round(num(sp, "jeda", 500, 200, 1500) / (1000 / BRAT_FPS)));
+      // Teks panjang dimunculkan beberapa kata sekaligus supaya jumlah gambar yang dirender tetap terbatas.
+      const step = Math.ceil(words.length / BRAT_MAX_STEPS);
+      const frames: Buffer[] = [];
+      for (let n = step; n < words.length + step; n += step) {
+        const part = words.slice(0, n).join(" ");
+        // Efek buram bawaan perender butuh detik per gambar, terlalu lambat untuk puluhan bingkai.
+        // Jadi bingkai dirender tajam, lalu diburamkan di sini.
+        const rgba = PNG.sync.read(await renderBuffer(bratNode(part, theme, false), 512, 512)).data;
+        if (blur) blurRgba(rgba, 512, 512, bratBlur(bratSize(part)));
+        frames.push(rgba);
+      }
+      const video = await encodeMp4(frames, 512, 512, hold, BRAT_FPS * 2);
+      return binaryResponse(video, "video/mp4", "public, max-age=86400");
     },
   },
   {
