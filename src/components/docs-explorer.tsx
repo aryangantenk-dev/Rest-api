@@ -15,6 +15,7 @@ type Result = {
   type: string;
   text?: string;
   img?: string;
+  video?: string;
   frame?: string;
   size?: number;
   error?: string;
@@ -88,11 +89,11 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
         URL.revokeObjectURL(imgRef.current);
         imgRef.current = null;
       }
-      if (type.startsWith("image/")) {
+      if (type.startsWith("image/") || type.startsWith("video/")) {
         const blob = await r.blob();
-        const img = URL.createObjectURL(blob);
-        imgRef.current = img;
-        setRes({ ok: r.ok, status: r.status, ms, type, img, size: blob.size });
+        const src = URL.createObjectURL(blob);
+        imgRef.current = src;
+        setRes({ ok: r.ok, status: r.status, ms, type, ...(type.startsWith("video/") ? { video: src } : { img: src }), size: blob.size });
       } else {
         const raw = await r.text();
         let text = raw;
@@ -148,7 +149,7 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
             </span>
             <span className="mt-1 block text-sm text-muted">{e.description}</span>
           </span>
-          {e.kind !== "json" && <span className="mt-0.5 hidden shrink-0 border border-line px-2 font-mono text-xs text-muted sm:block">{e.kind === "image" ? "gambar" : "HTML"}</span>}
+          {e.kind !== "json" && <span className="mt-0.5 hidden shrink-0 border border-line px-2 font-mono text-xs text-muted sm:block">{e.kind === "image" ? "gambar" : e.kind === "video" ? "video" : "HTML"}</span>}
           <ChevronIcon className="chev mt-0.5 shrink-0 text-muted" />
         </button>
       </h3>
@@ -304,6 +305,13 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
                   <div className="enter">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={res.img} alt={`Hasil ${e.title}`} className="max-h-80 max-w-full border border-codeline bg-white/5" />
+                    <p className="tnum mt-3 text-codemuted">
+                      {res.type} · {((res.size ?? 0) / 1024).toFixed(1)} KB
+                    </p>
+                  </div>
+                ) : res.video ? (
+                  <div className="enter">
+                    <video src={res.video} controls playsInline aria-label={`Hasil ${e.title}`} className="max-h-80 max-w-full border border-codeline bg-black" />
                     <p className="tnum mt-3 text-codemuted">
                       {res.type} · {((res.size ?? 0) / 1024).toFixed(1)} KB
                     </p>

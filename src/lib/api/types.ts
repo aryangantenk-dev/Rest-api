@@ -35,7 +35,7 @@ export type Endpoint = {
   title: string;
   description: string;
   params: Param[];
-  kind: "json" | "image" | "html";
+  kind: "json" | "image" | "video" | "html";
   handler: (ctx: Ctx) => Promise<unknown>;
 };
 

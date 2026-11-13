@@ -16,6 +16,7 @@ export type ConsoleEndpoint = {
 type Result =
   | { kind: "json" | "text"; status: number; ok: boolean; ms: number; type: string; text: string; cut: boolean }
   | { kind: "image"; status: number; ok: boolean; ms: number; type: string; src: string }
+  | { kind: "video"; status: number; ok: boolean; ms: number; type: string; src: string }
   | { kind: "html"; status: number; ok: boolean; ms: number; type: string; href: string }
   | { kind: "error"; message: string };
 
@@ -29,8 +30,8 @@ async function request(target: string, signal: AbortSignal): Promise<Result | nu
     const r = await fetch(`/api/${target}`, { signal });
     const type = (r.headers.get("content-type") ?? "").split(";")[0];
     const ms = Math.round(performance.now() - t0);
-    if (type.startsWith("image/")) {
-      return { kind: "image", status: r.status, ok: r.ok, ms, type, src: URL.createObjectURL(await r.blob()) };
+    if (type.startsWith("image/") || type.startsWith("video/")) {
+      return { kind: type.startsWith("video/") ? "video" : "image", status: r.status, ok: r.ok, ms, type, src: URL.createObjectURL(await r.blob()) };
     }
     if (r.ok && type === "text/html") {
       return { kind: "html", status: r.status, ok: r.ok, ms, type, href: `/api/${target}` };
@@ -101,11 +102,11 @@ export function TryConsole({ endpoints, picks, fallback, sample }: { endpoints: 
     const next = await request(target, ctrl.signal);
     if (abortRef.current !== ctrl) {
       // Sudah digantikan permintaan yang lebih baru: buang hasil ini.
-      if (next?.kind === "image") URL.revokeObjectURL(next.src);
+      if (next?.kind === "image" || next?.kind === "video") URL.revokeObjectURL(next.src);
       return;
     }
     if (imgRef.current) URL.revokeObjectURL(imgRef.current);
-    imgRef.current = next?.kind === "image" ? next.src : null;
+    imgRef.current = next?.kind === "image" || next?.kind === "video" ? next.src : null;
     if (next) setRes(next);
     setLoading(false);
   }
@@ -264,6 +265,8 @@ export function TryConsole({ endpoints, picks, fallback, sample }: { endpoints: 
           ) : res.kind === "image" ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={res.src} alt="Gambar hasil permintaan" className="enter max-h-full max-w-full border border-codeline" />
+          ) : res.kind === "video" ? (
+            <video src={res.src} controls playsInline aria-label="Video hasil permintaan" className="enter max-h-full max-w-full border border-codeline bg-black" />
           ) : res.kind === "html" ? (
             <p className="enter font-sans text-base">
               Endpoint ini mengembalikan halaman HTML.{" "}

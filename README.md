@@ -1,6 +1,6 @@
 # yanz.api
 
-REST API gratis tanpa API key (150 endpoint) beserta dokumentasi dan playground interaktif. Dibangun dengan Next.js 16 (App Router).
+REST API gratis tanpa API key (155 endpoint) beserta dokumentasi dan playground interaktif. Dibangun dengan Next.js 16 (App Router).
 
 ## Menjalankan lokal
 
