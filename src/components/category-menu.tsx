@@ -7,7 +7,7 @@ import { ChevronIcon } from "./icons";
 export type CategoryMenuItem = { href: string; name: string; count: number };
 
 /**
- * Menu filter kategori: daftar vertikal bergaya gelap dengan penanda radio.
+ * Menu filter kategori: daftar vertikal dengan penanda radio, mengikuti tema situs.
  *
  * Tiap baris adalah tautan ke halaman kategorinya, jadi memilih baris langsung
  * menyaring daftar endpoint, dan hanya satu kategori yang bisa aktif. Di layar

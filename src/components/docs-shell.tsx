@@ -32,7 +32,7 @@ export function DocsShell({ active }: { active?: CategoryId }) {
     <div className="mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6 lg:pt-12">
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[18rem_minmax(0,1fr)] lg:gap-12">
         {/* menu filter kategori: selalu terlihat di layar lebar, dilipat di layar kecil */}
-        <aside className="min-w-0 lg:sticky lg:top-[calc(var(--header-h)+1.5rem)] lg:max-h-[calc(100dvh-var(--header-h)-3rem)] lg:self-start lg:overflow-y-auto">
+        <aside className="min-w-0 lg:sticky lg:top-[calc(var(--header-h)+1.5rem)] lg:self-start">
           <CategoryMenu key={activeHref} items={menu} active={activeHref} />
         </aside>
 

@@ -34,15 +34,6 @@
   --code-ok: #4ade80;
   --code-danger: #f87171;
 
-  /* Menu filter kategori: selalu gelap dengan palet abu hangat, di kedua tema. */
-  --menu: #1e1a1a;
-  --menu-line: #332e2e;
-  --menu-fg: #f5f5f5;
-  --menu-hover: #262121;
-  --menu-active: #2c2727;
-  --menu-radio: #b0a8a8;
-  --menu-accent: #f28b82;
-
   /* Token gerak: dipilih menurut jarak dan peran, bukan satu durasi untuk semua. */
   --dur-press: 100ms;
   --dur-fast: 150ms;
@@ -293,21 +284,23 @@ select {
 
 /* ---------- Menu filter kategori ----------
    Daftar vertikal selebar wadahnya. Seluruh baris bisa diklik; lingkaran di kanan
-   hanya penanda pilihan. */
+   hanya penanda pilihan. Semua warna diambil dari token tema, jadi menunya ikut
+   tema terang dan gelap seperti kartu endpoint di sebelahnya. */
 .cat-menu {
-  background: var(--menu);
-  color: var(--menu-fg);
+  background: var(--card);
+  color: var(--fg);
+  border: 1px solid var(--line);
 }
 .cat-heading,
 .cat-label {
-  color: var(--menu-radio);
+  color: var(--muted);
   font-size: 0.8125rem;
   font-weight: 500;
   line-height: 1.4;
 }
 .cat-heading {
   padding: 0.875rem 1.25rem;
-  border-bottom: 1px solid var(--menu-line);
+  border-bottom: 1px solid var(--line);
 }
 .cat-row {
   display: flex;
@@ -317,8 +310,8 @@ select {
   width: 100%;
   min-height: 3.5rem;
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--menu-line);
-  color: var(--menu-fg);
+  border-bottom: 1px solid var(--line);
+  color: var(--fg);
   font-size: 0.9375rem;
   font-weight: 600;
   line-height: 1.4;
@@ -326,16 +319,17 @@ select {
   cursor: pointer;
   transition: all 0.2s ease;
 }
+/* Hover berada di antara warna kartu dan warna baris terpilih, supaya keduanya
+   tidak tertukar. */
 .cat-row:hover {
-  background: var(--menu-hover);
+  background: color-mix(in srgb, var(--subtle) 50%, var(--card));
 }
 .cat-row[data-selected="true"] {
-  background: var(--menu-active);
+  background: var(--subtle);
 }
-/* Cincin fokus digambar di dalam baris dan memakai warna teks menu, karena warna
-   cincin situs tidak terlihat di atas latar gelap ini. */
+/* Cincin fokus digambar di dalam baris supaya tidak terpotong tepi menu. */
 .cat-row:focus-visible {
-  outline: 2px solid var(--menu-fg);
+  outline: 2px solid var(--ring);
   outline-offset: -2px;
 }
 .cat-list > li:last-child > .cat-row,
@@ -348,33 +342,49 @@ button.cat-row[aria-expanded="false"] {
   flex: none;
   width: 1.25rem;
   height: 1.25rem;
-  border: 2px solid var(--menu-radio);
+  border: 2px solid var(--control);
   border-radius: 9999px;
   transition: all 0.2s ease;
 }
+/* Pilihan ditandai dengan titik isi, bukan warna saja. Warnanya `--accent-edge`
+   karena hijau aksen terlalu pucat sebagai batas kontrol di tema terang. */
 .cat-radio::after {
   content: "";
   width: 0.625rem;
   height: 0.625rem;
   border-radius: 9999px;
-  background: var(--menu-accent);
+  background: var(--accent-edge);
   opacity: 0;
   transform: scale(0);
   transition: all 0.2s ease;
 }
 .cat-row[data-selected="true"] .cat-radio {
-  border-color: var(--menu-accent);
+  border-color: var(--accent-edge);
 }
 .cat-row[data-selected="true"] .cat-radio::after {
   opacity: 1;
   transform: none;
 }
-/* Di layar lebar daftarnya selalu terbuka; tombol lipat hanya ada di layar kecil. */
+/* Di layar lebar daftarnya selalu terbuka; tombol lipat hanya ada di layar kecil.
+   Kalau layarnya pendek, yang bergulir hanya daftarnya: judul "Kategori" tetap di
+   tempat dan bilah gulirnya tipis serta berada di dalam bingkai menu. */
 @media (min-width: 64rem) {
+  .cat-menu {
+    display: flex;
+    flex-direction: column;
+    /* 4.5rem = jarak atas halaman (3rem) + sela bawah (1.5rem), supaya menu tidak
+       menempel ke tepi bawah layar sebelum halaman digulir. */
+    max-height: calc(100dvh - var(--header-h) - 4.5rem);
+  }
   .cat-list.panel {
     display: block;
     opacity: 1;
     transform: none;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--control) transparent;
   }
   /* Disembunyikan di sini, bukan lewat utility: aturan `.cat-row` di atas tidak
      berada di dalam layer, jadi `lg:hidden` akan kalah darinya. */
