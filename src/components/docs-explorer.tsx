@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type { EndpointMeta } from "@/lib/api/types";
 import type { Category } from "@/lib/api/categories";
 import { colorizeJson } from "@/lib/highlight";
@@ -15,16 +15,28 @@ type Result = {
   type: string;
   text?: string;
   img?: string;
+  video?: string;
   frame?: string;
   size?: number;
   error?: string;
 };
 
+/** Gulir ke elemen dengan jarak aman dari header dan kolom pencarian yang menempel di atas. */
+function scrollToEl(el: Element | null | undefined) {
+  if (!el) return;
+  const top = el.getBoundingClientRect().top + window.scrollY - 148;
+  const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  window.scrollTo({ top: Math.max(0, top), behavior: calm ? "auto" : "smooth" });
+}
+
 function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: string; forceOpen: boolean }) {
   const id = `${e.category}-${e.slug}`;
   const origin = useOrigin(fallback);
   const [open, setOpen] = useState(false);
+  // Isi playground baru dipasang saat kartu pertama kali dibuka agar halaman dengan ratusan kartu tetap ringan.
+  const [mounted, setMounted] = useState(false);
   const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(e.params.map((p) => [p.name, p.example ?? ""])));
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [res, setRes] = useState<Result | null>(null);
   const [tab, setTab] = useState<"respons" | "kode">("respons");
@@ -33,12 +45,14 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
   const imgRef = useRef<string | null>(null);
 
   const isOpen = open || forceOpen;
+  const showPanel = mounted || isOpen;
 
   useEffect(() => {
     const check = () => {
       if (window.location.hash === `#${id}`) {
+        setMounted(true);
         setOpen(true);
-        setTimeout(() => ref.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
+        setTimeout(() => scrollToEl(ref.current), 120);
       }
     };
     check();
@@ -75,11 +89,11 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
         URL.revokeObjectURL(imgRef.current);
         imgRef.current = null;
       }
-      if (type.startsWith("image/")) {
+      if (type.startsWith("image/") || type.startsWith("video/")) {
         const blob = await r.blob();
-        const img = URL.createObjectURL(blob);
-        imgRef.current = img;
-        setRes({ ok: r.ok, status: r.status, ms, type, img, size: blob.size });
+        const src = URL.createObjectURL(blob);
+        imgRef.current = src;
+        setRes({ ok: r.ok, status: r.status, ms, type, ...(type.startsWith("video/") ? { video: src } : { img: src }), size: blob.size });
       } else {
         const raw = await r.text();
         let text = raw;
@@ -92,199 +106,238 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
         setRes({ ok: r.ok, status: r.status, ms, type, text, frame, size: raw.length });
       }
     } catch {
-      setRes({ ok: false, status: 0, ms: Math.round(performance.now() - t0), type: "", error: "Tidak dapat terhubung ke server." });
+      setRes({ ok: false, status: 0, ms: Math.round(performance.now() - t0), type: "", error: "Tidak dapat terhubung ke server. Periksa koneksimu, lalu kirim lagi." });
     } finally {
       setLoading(false);
     }
   }, [e.path, query]);
 
+  const onSubmit = (ev: FormEvent) => {
+    ev.preventDefault();
+    if (loading) return;
+    if (missing.length) {
+      // Tandai semua kolom wajib yang kosong dan pindahkan fokus ke yang pertama.
+      setTouched(Object.fromEntries(missing.map((p) => [p.name, true])));
+      const first = document.getElementById(`${id}-${missing[0].name}`);
+      (first instanceof HTMLInputElement ? first : first?.querySelector("button"))?.focus();
+      return;
+    }
+    void send();
+  };
+
   const snippets = buildSnippets(fullUrl);
 
   return (
-    <article ref={ref} id={id} className={`scroll-mt-36 overflow-hidden rounded-2xl border bg-surface transition-colors duration-300 ${isOpen ? "border-linestrong" : "border-line hover:border-linestrong"}`}>
+    <article ref={ref} id={id} className={`scroll-mt-36 border bg-card transition-colors duration-150 ${isOpen ? "border-control" : "border-line hover:border-control"}`}>
       <h3 className="m-0">
         <button
           type="button"
           aria-expanded={isOpen}
           aria-controls={`${id}-panel`}
           onClick={() => {
+            setMounted(true);
             setOpen(!isOpen);
             if (!isOpen) history.replaceState(null, "", `#${id}`);
           }}
-          className="flex w-full items-center gap-3 p-4 text-left sm:gap-4 sm:p-5"
+          className="flex min-h-14 w-full items-start gap-3 p-3 text-left sm:gap-4 sm:p-4"
         >
-          <span className="shrink-0 rounded-md bg-mint/15 px-2 py-1 font-mono text-[10px] font-semibold tracking-wider text-mint">GET</span>
+          <span className="mt-0.5 shrink-0 font-mono text-sm font-bold text-ok">GET</span>
           <span className="min-w-0 flex-1">
-            <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <span className="font-display text-base font-semibold tracking-tight sm:text-lg">{e.title}</span>
-              <code className="truncate font-mono text-xs text-muted">{e.path}</code>
+            <span className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+              <span className="text-base font-semibold">{e.title}</span>
+              <code className="wrap-anywhere font-mono text-sm text-muted">{e.path}</code>
             </span>
-            <span className="mt-1 line-clamp-2 text-[13px] leading-snug text-muted sm:line-clamp-1">{e.description}</span>
+            <span className="mt-1 block text-sm text-muted">{e.description}</span>
           </span>
-          {e.kind === "image" && <span className="hidden rounded-full border border-line px-2.5 py-1 font-mono text-[10px] text-dim sm:block">image/*</span>}
-          {e.kind === "html" && <span className="hidden rounded-full border border-line px-2.5 py-1 font-mono text-[10px] text-dim sm:block">text/html</span>}
-          <ChevronIcon className={`shrink-0 text-dim transition-transform duration-300 ${isOpen ? "rotate-180 text-ember" : ""}`} />
+          {e.kind !== "json" && <span className="mt-0.5 hidden shrink-0 border border-line px-2 font-mono text-xs text-muted sm:block">{e.kind === "image" ? "gambar" : e.kind === "video" ? "video" : "HTML"}</span>}
+          <ChevronIcon className="chev mt-0.5 shrink-0 text-muted" />
         </button>
       </h3>
 
-      <div id={`${id}-panel`} className={`accordion-panel ${isOpen ? "open" : ""}`} aria-hidden={!isOpen} inert={!isOpen}>
-        <div>
-          <div className="grid grid-cols-1 gap-px border-t border-line bg-line lg:grid-cols-2">
+      <div id={`${id}-panel`} data-open={isOpen} className="panel">
+        {showPanel && (
+          <div className="grid grid-cols-1 border-t border-line lg:grid-cols-2">
             {/* kiri: parameter */}
-            <div className="min-w-0 space-y-5 bg-surface p-4 sm:p-6">
-              <p className="text-sm leading-relaxed text-muted">{e.description}</p>
-
+            <form onSubmit={onSubmit} noValidate className="min-w-0 space-y-5 p-4 sm:p-5">
               {e.params.length ? (
-                <div>
-                  <h4 className="font-mono text-[11px] uppercase tracking-[0.16em] text-dim">Parameter query</h4>
-                  <div className="mt-3 space-y-4">
-                    {e.params.map((p) => (
+                <fieldset className="space-y-4">
+                  <legend className="text-sm font-semibold">Parameter query</legend>
+                  {e.params.map((p) => {
+                    const fid = `${id}-${p.name}`;
+                    const invalid = !!p.required && !!touched[p.name] && !values[p.name]?.trim();
+                    return (
                       <div key={p.name}>
-                        <label htmlFor={`${id}-${p.name}`} className="flex items-center gap-2 text-sm">
-                          <code className="font-mono text-[13px] text-fg">{p.name}</code>
-                          {p.required ? (
-                            <span className="rounded bg-ember/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-ember">wajib</span>
-                          ) : (
-                            <span className="font-mono text-[9px] uppercase tracking-wider text-dim">opsional</span>
-                          )}
+                        <label htmlFor={p.options ? undefined : fid} id={`${fid}-label`} className="flex flex-wrap items-center gap-2">
+                          <code className="font-mono text-sm font-bold">{p.name}</code>
+                          <span className={`text-xs ${p.required ? "font-semibold text-fg" : "text-muted"}`}>{p.required ? "wajib" : "opsional"}</span>
                         </label>
-                        <p className="mt-1 text-xs text-muted">{p.description}</p>
-                        <input
-                          id={`${id}-${p.name}`}
-                          value={values[p.name] ?? ""}
-                          onChange={(ev) => setValues((v) => ({ ...v, [p.name]: ev.target.value }))}
-                          onKeyDown={(ev) => ev.key === "Enter" && missing.length === 0 && send()}
-                          spellCheck={false}
-                          autoComplete="off"
-                          placeholder={p.example || p.name}
-                          className="mt-2 w-full rounded-xl border border-line bg-bg px-3.5 py-2.5 font-mono text-base text-fg outline-none transition-colors placeholder:text-dim focus:border-ember/60 sm:text-[13px]"
-                        />
+                        <p id={`${fid}-help`} className="mt-1 text-sm text-muted">
+                          {p.description}
+                        </p>
+                        {p.options ? (
+                          <div id={fid} role="group" aria-labelledby={`${fid}-label`} aria-describedby={`${fid}-help`} className="mt-2 flex flex-wrap gap-2">
+                            {p.options.map((o) => {
+                              const active = (values[p.name] ?? "") === o;
+                              return (
+                                <button
+                                  key={o}
+                                  type="button"
+                                  aria-pressed={active}
+                                  onClick={() => setValues((v) => ({ ...v, [p.name]: active && !p.required ? "" : o }))}
+                                  className={`min-h-11 border px-3 font-mono text-sm transition-colors duration-150 ${
+                                    active ? "border-fg bg-fg text-bg" : "border-control bg-card text-fg hover:bg-subtle"
+                                  }`}
+                                >
+                                  {o}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <input
+                            id={fid}
+                            value={values[p.name] ?? ""}
+                            onChange={(ev) => setValues((v) => ({ ...v, [p.name]: ev.target.value }))}
+                            onBlur={() => setTouched((t) => ({ ...t, [p.name]: true }))}
+                            required={p.required}
+                            aria-invalid={invalid}
+                            aria-describedby={invalid ? `${fid}-error ${fid}-help` : `${fid}-help`}
+                            spellCheck={false}
+                            autoComplete="off"
+                            autoCapitalize="none"
+                            placeholder={p.example ? `mis. ${p.example}` : undefined}
+                            className="field mt-2"
+                          />
+                        )}
+                        {invalid && (
+                          <p id={`${fid}-error`} role="alert" className="mt-1 text-sm font-medium text-danger">
+                            Parameter {p.name} wajib diisi.
+                          </p>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    );
+                  })}
+                </fieldset>
               ) : (
-                <p className="rounded-xl border border-dashed border-line px-4 py-3 text-sm text-muted">Endpoint ini tidak membutuhkan parameter apa pun.</p>
+                <p className="text-sm text-muted">Endpoint ini tidak membutuhkan parameter.</p>
               )}
 
-              <div className="flex items-center gap-2 rounded-xl border border-line bg-bg py-1.5 pl-3.5 pr-1.5">
-                <code className="min-w-0 flex-1 truncate font-mono text-xs text-muted" title={fullUrl}>
-                  {fullUrl}
-                </code>
+              <div className="flex items-center border border-line bg-bg">
+                <code className="wrap-anywhere min-w-0 flex-1 px-3 py-2 font-mono text-sm text-muted">{fullUrl}</code>
                 <CopyButton text={fullUrl} label="URL" />
               </div>
 
-              <button
-                type="button"
-                onClick={send}
-                disabled={loading || missing.length > 0}
-                className="btn-primary inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:shadow-none sm:w-auto"
-              >
-                {loading ? (
-                  <span className="h-4 w-4 rounded-full border-2 border-bg/30 border-t-bg" style={{ animation: "spin 0.7s linear infinite" }} />
-                ) : (
-                  <PlayIcon />
-                )}
-                {loading ? "Mengirim…" : missing.length ? `Isi ${missing[0].name} dulu` : "Kirim permintaan"}
+              <button type="submit" disabled={loading} className="btn btn-primary w-full sm:w-auto">
+                {loading ? <span className="spin h-4 w-4 rounded-full border-2 border-onaccent/30 border-t-onaccent" aria-hidden /> : <PlayIcon />}
+                {loading ? "Mengirim" : "Kirim permintaan"}
               </button>
-            </div>
+            </form>
 
             {/* kanan: respons / kode */}
-            <div className="flex min-h-[240px] min-w-0 flex-col bg-[#0d0b0a] lg:min-h-[320px]">
-              <div className="flex items-center justify-between border-b border-line px-4">
-                <div role="tablist" className="flex">
+            <div className="flex min-w-0 flex-col bg-code text-codefg">
+              <div className="flex items-stretch justify-between gap-2 border-b border-codeline">
+                <div role="tablist" aria-label="Tampilan hasil" className="flex">
                   {(["respons", "kode"] as const).map((t) => (
                     <button
                       key={t}
+                      type="button"
                       role="tab"
+                      id={`${id}-tab-${t}`}
                       aria-selected={tab === t}
+                      aria-controls={`${id}-out`}
                       onClick={() => setTab(t)}
-                      className={`relative px-3 py-3.5 text-xs font-medium capitalize transition-colors ${tab === t ? "text-fg" : "text-dim hover:text-muted"}`}
+                      className={`relative min-h-11 px-4 text-sm font-medium capitalize transition-colors duration-150 ${tab === t ? "text-codefg" : "text-codemuted hover:text-codefg"}`}
                     >
                       {t}
-                      <span className={`absolute inset-x-2 bottom-0 h-px bg-ember transition-opacity ${tab === t ? "opacity-100" : "opacity-0"}`} />
+                      {tab === t && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-accent" aria-hidden />}
                     </button>
                   ))}
                 </div>
-                {tab === "respons" && res && (
-                  <div className="flex items-center gap-3 font-mono text-[11px]">
-                    <span className={res.ok ? "text-mint" : "text-rose"}>● {res.status || "ERR"}</span>
-                    <span className="text-dim">{res.ms} ms</span>
+                {tab === "respons" ? (
+                  <div role="status" className="flex items-center gap-3 pr-4 font-mono text-sm text-codemuted">
+                    {loading ? (
+                      <span>Menunggu respons</span>
+                    ) : res ? (
+                      <>
+                        <span className={`inline-flex items-center gap-2 font-semibold ${res.ok ? "text-codeok" : "text-codedanger"}`}>
+                          <span className={`h-2 w-2 ${res.ok ? "bg-codeok" : "bg-codedanger"}`} aria-hidden />
+                          {res.status ? `${res.status} ${res.ok ? "OK" : "gagal"}` : "Gagal"}
+                        </span>
+                        <span className="tnum">{res.ms} ms</span>
+                      </>
+                    ) : null}
                   </div>
-                )}
-                {tab === "kode" && (
-                  <div className="flex items-center gap-1">
+                ) : (
+                  <div className="flex items-center">
                     <select
-                      aria-label="Bahasa"
+                      aria-label="Bahasa contoh kode"
                       value={lang}
                       onChange={(ev) => setLang(ev.target.value)}
-                      className="rounded-md border border-line bg-transparent px-2 py-1 text-xs text-muted outline-none"
+                      className="min-h-11 border-l border-codeline bg-code px-3 text-sm text-codefg"
                     >
                       {Object.keys(snippets).map((k) => (
-                        <option key={k} value={k} className="bg-surface">
+                        <option key={k} value={k}>
                           {k}
                         </option>
                       ))}
                     </select>
-                    <CopyButton text={snippets[lang]} />
+                    <CopyButton text={snippets[lang]} tone="code" />
                   </div>
                 )}
               </div>
 
-              <div className="relative flex-1 overflow-auto p-4">
+              <div id={`${id}-out`} role="tabpanel" aria-labelledby={`${id}-tab-${tab}`} tabIndex={0} className="max-h-[28rem] min-h-60 flex-1 overflow-auto p-4 font-mono text-sm leading-relaxed">
                 {tab === "kode" ? (
-                  <pre className="response-in whitespace-pre-wrap break-all font-mono text-[12.5px] leading-relaxed text-[#d8d0c3]">
+                  <pre key={lang} className="enter wrap-anywhere whitespace-pre-wrap">
                     <code>{snippets[lang]}</code>
                   </pre>
                 ) : loading ? (
-                  <div className="space-y-2.5 pt-1" aria-label="Memuat">
+                  <div className="space-y-3" aria-hidden>
                     {[70, 45, 85, 55, 30].map((w, i) => (
-                      <div key={i} className="h-3 animate-pulse rounded bg-white/[0.06]" style={{ width: `${w}%`, animationDelay: `${i * 90}ms` }} />
+                      <div key={i} className="h-3 animate-pulse bg-white/10" style={{ width: `${w}%` }} />
                     ))}
                   </div>
                 ) : !res ? (
-                  <div className="grid h-full min-h-[160px] place-items-center text-center lg:min-h-[220px]">
-                    <div>
-                      <div className="mx-auto grid h-11 w-11 place-items-center rounded-full border border-line text-dim">
-                        <PlayIcon />
-                      </div>
-                      <p className="mt-3 text-sm text-muted">Tekan &ldquo;Kirim permintaan&rdquo; untuk melihat hasilnya di sini.</p>
-                    </div>
-                  </div>
+                  <p className="font-sans text-base text-codemuted">Respons muncul di sini setelah kamu menekan &ldquo;Kirim permintaan&rdquo;.</p>
                 ) : res.error ? (
-                  <p className="response-in text-sm text-rose">{res.error}</p>
+                  <p className="enter font-sans text-base text-codedanger">{res.error}</p>
                 ) : res.img ? (
-                  <div className="response-in">
+                  <div className="enter">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={res.img} alt={`Hasil ${e.title}`} className="max-h-[360px] max-w-full rounded-lg border border-line bg-[repeating-conic-gradient(#1a1714_0%_25%,#141210_0%_50%)] [background-size:16px_16px]" />
-                    <p className="mt-3 font-mono text-[11px] text-dim">
+                    <img src={res.img} alt={`Hasil ${e.title}`} className="max-h-80 max-w-full border border-codeline bg-white/5" />
+                    <p className="tnum mt-3 text-codemuted">
+                      {res.type} · {((res.size ?? 0) / 1024).toFixed(1)} KB
+                    </p>
+                  </div>
+                ) : res.video ? (
+                  <div className="enter">
+                    <video src={res.video} controls playsInline aria-label={`Hasil ${e.title}`} className="max-h-80 max-w-full border border-codeline bg-black" />
+                    <p className="tnum mt-3 text-codemuted">
                       {res.type} · {((res.size ?? 0) / 1024).toFixed(1)} KB
                     </p>
                   </div>
                 ) : res.frame ? (
-                  <div className="response-in">
+                  <div className="enter">
                     <iframe
                       src={res.frame}
                       title={`Hasil ${e.title}`}
                       allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
                       allowFullScreen
-                      className="aspect-video w-full rounded-lg border border-line bg-black"
+                      className="aspect-video w-full border border-codeline bg-black"
                     />
-                    <p className="mt-3 font-mono text-[11px] text-dim">
-                      {res.type} · pratinjau langsung di dalam &lt;iframe&gt;
-                    </p>
+                    <p className="mt-3 text-codemuted">{res.type} · pratinjau langsung di dalam &lt;iframe&gt;</p>
                   </div>
                 ) : (
                   <pre
                     key={res.ms + (res.text?.length ?? 0)}
-                    className="response-in whitespace-pre-wrap break-words font-mono text-[12.5px] leading-relaxed text-[#cfc7ba]"
+                    className="enter wrap-anywhere whitespace-pre-wrap"
                     dangerouslySetInnerHTML={{ __html: colorizeJson((res.text ?? "").slice(0, 60000)) }}
                   />
                 )}
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </article>
   );
@@ -316,54 +369,148 @@ export function DocsExplorer({ endpoints, categories, fallback, showGroupHeading
 
   const groups = categories.map((c) => ({ c, items: filtered.filter((e) => e.category === c.id) })).filter((g) => g.items.length);
 
+  // Kategori bisa dilipat seperti kartu endpoint. Awalnya hanya kategori pertama yang terbuka
+  // supaya halaman tetap ringkas; pencarian dan tautan #hash membuka kategori terkait otomatis.
+  const collapsible = showGroupHeadings && categories.length > 1;
+  const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set(categories[0] ? [categories[0].id] : []));
+  const allOpen = categories.every((c) => openGroups.has(c.id));
+  const toggleGroup = useCallback((id: string) => {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!collapsible) return;
+    const check = () => {
+      const hash = decodeURIComponent(window.location.hash.slice(1));
+      if (!hash) return;
+      const cat = categories.find((c) => hash === `grp-${c.id}` || hash.startsWith(`${c.id}-`));
+      if (!cat) return;
+      setOpenGroups((prev) => (prev.has(cat.id) ? prev : new Set(prev).add(cat.id)));
+      // Gulir ulang setelah kategori terbuka agar posisi kartu tepat.
+      setTimeout(() => scrollToEl(document.getElementById(hash)), 260);
+    };
+    check();
+    window.addEventListener("hashchange", check);
+    return () => window.removeEventListener("hashchange", check);
+  }, [collapsible, categories]);
+
   return (
     <div>
-      <div className="sticky top-14 z-30 -mx-1 bg-bg/80 px-1 py-3 backdrop-blur-xl">
-        <div className="group relative">
-          <SearchIcon className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-dim transition-colors group-focus-within:text-ember" />
+      <div className="sticky top-[var(--header-h)] z-30 -mx-4 bg-bg px-4 py-3 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0">
+        <div className="flex items-stretch border border-control bg-card focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring">
+          <label htmlFor="cari-endpoint" className="flex items-center gap-2 pl-3 text-sm font-medium text-muted">
+            <SearchIcon />
+            Cari
+          </label>
           <input
             ref={input}
+            id="cari-endpoint"
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Cari endpoint, mis. cuaca"
-            aria-label="Cari endpoint"
-            className="w-full rounded-2xl border border-line bg-surface py-3.5 pl-12 pr-4 text-base text-fg outline-none transition-colors placeholder:text-dim focus:border-ember/60 sm:pr-16 sm:text-sm"
+            placeholder="mis. cuaca, tiktok, qrcode"
+            autoComplete="off"
+            enterKeyHint="search"
+            className="ring-on-parent min-h-12 min-w-0 flex-1 bg-transparent px-3 text-base text-fg placeholder:text-muted"
           />
-          <kbd className="pointer-events-none absolute right-4 top-1/2 hidden -translate-y-1/2 rounded-md border border-line px-2 py-0.5 font-mono text-[11px] text-dim sm:block">/</kbd>
+          <kbd className="mr-3 hidden self-center border border-line px-2 font-mono text-xs text-muted sm:block" title="Tekan / untuk mencari">
+            /
+          </kbd>
         </div>
       </div>
 
+      <div className="mt-1 flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <p role="status" className="text-sm text-muted">
+          {term ? `${filtered.length} endpoint cocok dengan “${q.trim()}”` : collapsible ? "Pilih kategori untuk melihat endpoint di dalamnya." : `${endpoints.length} endpoint`}
+        </p>
+        {collapsible && !term && (
+          <button type="button" onClick={() => setOpenGroups(allOpen ? new Set() : new Set(categories.map((c) => c.id)))} className="btn btn-secondary shrink-0 text-sm">
+            {allOpen ? "Tutup semua" : "Buka semua"}
+          </button>
+        )}
+      </div>
+
       {groups.length === 0 ? (
-        <div className="mt-10 rounded-2xl border border-dashed border-line px-6 py-16 text-center">
-          <p className="font-display text-xl">Tidak ada endpoint yang cocok</p>
-          <p className="mt-2 text-sm text-muted">Coba kata kunci lain seperti &ldquo;gambar&rdquo;, &ldquo;teks&rdquo;, atau &ldquo;cuaca&rdquo;.</p>
+        <div className="mt-6 border border-line bg-card px-4 py-12 text-center sm:px-6">
+          <p className="font-mono text-lg font-bold">Tidak ada endpoint yang cocok</p>
+          <p className="mx-auto mt-2 max-w-[50ch] text-muted">Coba kata kunci yang lebih pendek, seperti &ldquo;gambar&rdquo;, &ldquo;teks&rdquo;, atau &ldquo;cuaca&rdquo;.</p>
+          <button
+            type="button"
+            onClick={() => {
+              setQ("");
+              input.current?.focus();
+            }}
+            className="btn btn-secondary mt-6"
+          >
+            Hapus pencarian
+          </button>
         </div>
       ) : (
-        <div className="mt-6 space-y-14">
-          {groups.map(({ c, items }) => (
-            <section key={c.id} aria-labelledby={`grp-${c.id}`}>
-              {showGroupHeadings && (
-                <div className="mb-5 flex items-center gap-3 sm:gap-4">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-line bg-surface text-ember">
-                    <CategoryIcon id={c.id} className="h-5 w-5" />
-                  </span>
-                  <div className="min-w-0">
-                    <h2 id={`grp-${c.id}`} className="font-display text-xl font-semibold tracking-tight sm:text-2xl">
-                      {c.name}
-                    </h2>
-                    <p className="text-sm text-muted">{c.tagline}</p>
-                  </div>
-                  <span className="ml-auto font-mono text-xs text-dim">{items.length}</span>
-                </div>
-              )}
-              <div className="space-y-3">
+        <div className={collapsible ? "mt-3 space-y-2 [overflow-anchor:none]" : "mt-3 space-y-10"}>
+          {groups.map(({ c, items }) => {
+            const isOpen = !collapsible || !!term || openGroups.has(c.id);
+            const cards = (
+              <div className="space-y-2">
                 {items.map((e) => (
                   <EndpointCard key={e.path} e={e} fallback={fallback} forceOpen={!!term && filtered.length === 1} />
                 ))}
               </div>
-            </section>
-          ))}
+            );
+            if (!collapsible) {
+              return (
+                <section key={c.id} aria-labelledby={showGroupHeadings ? `grp-${c.id}` : undefined}>
+                  {showGroupHeadings && (
+                    <div className="mb-4 flex items-center gap-3">
+                      <CategoryIcon id={c.id} className="h-6 w-6 shrink-0 text-ok" />
+                      <div className="min-w-0 flex-1">
+                        <h2 id={`grp-${c.id}`} className="font-mono text-xl font-bold">
+                          {c.name}
+                        </h2>
+                        <p className="text-sm text-muted">{c.tagline}</p>
+                      </div>
+                      <span className="tnum font-mono text-sm text-muted">{items.length}</span>
+                    </div>
+                  )}
+                  {cards}
+                </section>
+              );
+            }
+            return (
+              <section key={c.id} aria-labelledby={`grp-${c.id}`} className="scroll-mt-36">
+                <h2 id={`grp-${c.id}`} className="scroll-mt-36">
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(c.id)}
+                    aria-expanded={isOpen}
+                    aria-controls={`grp-panel-${c.id}`}
+                    disabled={!!term}
+                    className={`flex min-h-16 w-full items-center gap-3 border px-3 py-2 text-left transition-colors duration-150 sm:gap-4 sm:px-4 ${
+                      isOpen ? "border-control bg-subtle" : "border-line bg-card hover:border-control hover:bg-subtle"
+                    }`}
+                  >
+                    <CategoryIcon id={c.id} className="h-6 w-6 shrink-0 text-ok" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-mono text-base font-bold sm:text-lg">{c.name}</span>
+                      <span className="block text-sm font-normal text-muted">{c.tagline}</span>
+                    </span>
+                    <span className="tnum shrink-0 font-mono text-sm font-normal text-muted">
+                      {items.length}
+                      <span className="hidden sm:inline"> endpoint</span>
+                    </span>
+                    {!term && <ChevronIcon className="chev shrink-0 text-muted" />}
+                  </button>
+                </h2>
+                <div id={`grp-panel-${c.id}`} data-open={isOpen} className="panel pt-2">
+                  {cards}
+                </div>
+              </section>
+            );
+          })}
         </div>
       )}
     </div>

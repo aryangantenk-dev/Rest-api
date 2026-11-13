@@ -1,16 +1,28 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import { Bricolage_Grotesque, Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
+import localFont from "next/font/local";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { endpoints } from "@/lib/api/registry";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE, SITE_URL } from "@/lib/site";
 import "./globals.css";
 
-const head = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-head", display: "swap" });
-const body = Geist({ subsets: ["latin"], variable: "--font-body", display: "swap" });
-const code = Geist_Mono({ subsets: ["latin"], variable: "--font-code", display: "swap" });
-const accent = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["normal", "italic"], variable: "--font-accent", display: "swap" });
+// Font disimpan di repo (lisensi OFL-1.1) supaya build tidak bergantung pada jaringan
+// dan ruang hurufnya sudah dipesan sejak awal (tanpa pergeseran tata letak).
+const body = localFont({
+  src: "./fonts/ibm-plex-sans-latin-wght-normal.woff2",
+  variable: "--font-body",
+  weight: "100 700",
+  display: "swap",
+  fallback: ["ui-sans-serif", "system-ui", "Segoe UI", "Arial", "sans-serif"],
+});
+const code = localFont({
+  src: "./fonts/jetbrains-mono-latin-wght-normal.woff2",
+  variable: "--font-code",
+  weight: "100 800",
+  display: "swap",
+  fallback: ["ui-monospace", "SFMono-Regular", "Menlo", "Consolas", "monospace"],
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -18,12 +30,12 @@ export const metadata: Metadata = {
   description: SITE_DESCRIPTION,
   applicationName: SITE_NAME,
   keywords: [
-    "yanxz api", "rest api gratis", "api tanpa apikey", "free rest api indonesia", "api downloader", "api ai chat gratis",
+    "yanz api", "yanz.api", "rest api gratis", "api tanpa apikey", "free rest api indonesia", "api downloader", "api ai chat gratis",
     "api cuaca", "api gempa bmkg", "api jadwal sholat", "api al-quran", "qr code api", "short url api", "api random quotes bahasa indonesia",
     "api developer indonesia", "no api key",
   ],
-  authors: [{ name: "Yanxz" }],
-  creator: "Yanxz",
+  authors: [{ name: SITE_NAME }],
+  creator: SITE_NAME,
   alternates: { canonical: "/" },
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 } },
   openGraph: {
@@ -39,11 +51,17 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0b0a09",
-  colorScheme: "dark",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f8fafc" },
+    { media: "(prefers-color-scheme: dark)", color: "#020617" },
+  ],
+  colorScheme: "light dark",
   width: "device-width",
   initialScale: 1,
 };
+
+// Dijalankan sebelum halaman digambar agar pilihan tema tersimpan tidak berkedip.
+const themeScript = `try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`;
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   const jsonLd = {
@@ -68,13 +86,18 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   };
 
   return (
-    <html lang="id" className={`${head.variable} ${body.variable} ${code.variable} ${accent.variable}`}>
-      <body className="min-h-screen font-sans">
-        <a href="#konten" className="fixed left-4 top-4 z-[60] -translate-y-20 rounded-lg bg-fg px-4 py-2 text-sm font-semibold text-bg focus:translate-y-0">
+    <html lang="id" className={`${body.variable} ${code.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body className="flex min-h-dvh flex-col font-sans">
+        <a href="#konten" className="btn btn-primary fixed left-4 top-2 z-[100] -translate-y-24 focus:translate-y-0">
           Lewati ke konten
         </a>
         <SiteHeader />
-        <main id="konten">{children}</main>
+        <main id="konten" tabIndex={-1} className="flex-1 pt-[var(--header-h)] outline-none">
+          {children}
+        </main>
         <SiteFooter total={endpoints.length} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       </body>

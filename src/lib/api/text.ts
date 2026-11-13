@@ -40,7 +40,7 @@ export const textEndpoints: Endpoint[] = [
     category: "text", slug: "case", kind: "json",
     title: "Konversi Huruf",
     description: "Ubah teks menjadi UPPER, lower, Title Case, camelCase, snake_case, kebab-case, dan lainnya sekaligus.",
-    params: [{ name: "text", required: true, description: "Teks input.", example: "yanxz rest api gratis" }],
+    params: [{ name: "text", required: true, description: "Teks input.", example: "yanz rest api gratis" }],
     handler: async ({ sp }) => {
       const text = need(sp, "text");
       const w = words(text);
@@ -96,7 +96,7 @@ export const textEndpoints: Endpoint[] = [
     category: "text", slug: "fancy", kind: "json",
     title: "Fancy Text",
     description: "Ubah teks biasa menjadi berbagai gaya huruf Unicode (bold, italic, script, fraktur, monospace, dll).",
-    params: [{ name: "text", required: true, description: "Teks input (huruf latin).", example: "Yanxz API" }],
+    params: [{ name: "text", required: true, description: "Teks input (huruf latin).", example: "Yanz API" }],
     handler: async ({ sp }) => {
       const text = need(sp, "text", 300);
       return { text, styles: Object.fromEntries(Object.entries(fancyFonts).map(([k, f]) => [k, stylize(text, f)])) };
@@ -107,7 +107,7 @@ export const textEndpoints: Endpoint[] = [
     title: "Kode Morse",
     description: "Terjemahkan teks ke kode Morse atau sebaliknya.",
     params: [
-      { name: "text", required: true, description: "Teks biasa atau kode morse (pisahkan huruf dengan spasi, kata dengan /).", example: "SOS Yanxz" },
+      { name: "text", required: true, description: "Teks biasa atau kode morse (pisahkan huruf dengan spasi, kata dengan /).", example: "SOS Yanz" },
       { name: "mode", description: "encode atau decode. Default: encode.", example: "encode" },
     ],
     handler: async ({ sp }) => {
@@ -127,7 +127,7 @@ export const textEndpoints: Endpoint[] = [
     title: "Teks ⇄ Biner",
     description: "Konversi teks UTF-8 ke biner, heksadesimal, dan sebaliknya.",
     params: [
-      { name: "text", required: true, description: "Teks biasa, atau deretan biner 8-bit bila mode decode.", example: "Yanxz" },
+      { name: "text", required: true, description: "Teks biasa, atau deretan biner 8-bit bila mode decode.", example: "Yanz" },
       { name: "mode", description: "encode atau decode. Default: encode.", example: "encode" },
     ],
     handler: async ({ sp }) => {

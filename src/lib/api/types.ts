@@ -7,13 +7,20 @@ export type CategoryId =
   | "islami"
   | "info"
   | "komik"
-  | "anime";
+  | "anime"
+  | "canvas"
+  | "search"
+  | "downloader"
+  | "games"
+  | "film";
 
 export type Param = {
   name: string;
   required?: boolean;
   description: string;
   example?: string;
+  /** Pilihan tetap; di halaman docs ditampilkan sebagai tombol pilihan, bukan kotak teks. */
+  options?: string[];
 };
 
 export type Ctx = {
@@ -28,7 +35,7 @@ export type Endpoint = {
   title: string;
   description: string;
   params: Param[];
-  kind: "json" | "image" | "html";
+  kind: "json" | "image" | "video" | "html";
   handler: (ctx: Ctx) => Promise<unknown>;
 };
 

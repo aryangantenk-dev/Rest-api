@@ -139,3 +139,138 @@ export const randomEndpoints: Endpoint[] = [
     },
   },
 ];
+
+/** Untuk endpoint gambar acak: redirect=1 langsung mengalihkan ke berkas gambar (cocok untuk <img src>). */
+function imageOut<T extends { image: string }>(sp: URLSearchParams, payload: T): T | Response {
+  if (opt(sp, "redirect") === "1") return new Response(null, { status: 302, headers: { location: payload.image, "cache-control": "no-store" } });
+  return payload;
+}
+
+const redirectParam = { name: "redirect", description: "Isi 1 untuk langsung dialihkan ke berkas gambar.", example: "" };
+
+const NEKOS_IMAGE = ["neko", "waifu", "husbando", "kitsune"];
+const NEKOS_GIF = [
+  "hug", "pat", "kiss", "cuddle", "smile", "wave", "cry", "dance", "happy", "laugh", "blush", "wink", "poke", "slap", "bite",
+  "highfive", "handhold", "nod", "sleep", "think", "thumbsup", "yawn", "baka", "bored", "facepalm", "feed", "pout", "shrug", "smug", "stare", "tickle",
+];
+
+type NekosItem = { url: string; artist_name?: string; artist_href?: string; source_url?: string; anime_name?: string };
+async function nekos(category: string): Promise<NekosItem> {
+  const d = await fetchJson<{ results?: NekosItem[] }>(`https://nekos.best/api/v2/${category}`);
+  const item = d.results?.[0];
+  if (!item?.url) throw new HttpError(502, "Sumber gambar anime tidak mengirim hasil.");
+  return item;
+}
+
+type Wall = { id: string; url: string; path: string; resolution: string; file_size: number; file_type: string; colors?: string[]; thumbs?: { large?: string } };
+async function wallhaven(q: string, categories: string, atleast = "1920x1080"): Promise<Wall> {
+  const d = await fetchJson<{ data?: Wall[] }>(
+    `https://wallhaven.cc/api/v1/search?q=${encodeURIComponent(q)}&categories=${categories}&purity=100&sorting=random&atleast=${atleast}&seed=${crypto.randomBytes(3).toString("hex")}`,
+  );
+  const list = d.data ?? [];
+  if (!list.length) throw new HttpError(404, "Tidak ada gambar yang cocok. Coba kata kunci lain.");
+  return list[crypto.randomInt(list.length)];
+}
+const wallOut = (w: Wall) => ({ image: w.path, thumbnail: w.thumbs?.large ?? null, resolution: w.resolution, size: w.file_size, type: w.file_type, colors: w.colors ?? [], source: w.url });
+
+const SCENERY: Record<string, string> = {
+  acak: "landscape", gunung: "mountains", pantai: "beach", hutan: "forest", danau: "lake", laut: "ocean", sawah: "rice field",
+  air_terjun: "waterfall", langit: "sky", senja: "sunset", malam: "night sky", kota: "cityscape", salju: "snow landscape", gurun: "desert",
+};
+
+const moreEndpoints: Endpoint[] = [
+  {
+    category: "random", slug: "anime", kind: "json",
+    title: "Gambar Anime",
+    description: "Ilustrasi anime acak yang aman untuk semua umur: neko, waifu, husbando, atau kitsune, lengkap dengan kredit artisnya.",
+    params: [{ name: "tipe", description: `Pilihan: ${NEKOS_IMAGE.join(", ")}. Default acak.`, example: "waifu" }, redirectParam],
+    handler: async ({ sp }) => {
+      const tipe = opt(sp, "tipe").toLowerCase() || pick(NEKOS_IMAGE);
+      if (!NEKOS_IMAGE.includes(tipe)) throw new HttpError(400, `Tipe tidak dikenal. Pilihan: ${NEKOS_IMAGE.join(", ")}.`);
+      const r = await nekos(tipe);
+      return imageOut(sp, { type: tipe, image: r.url, artist: r.artist_name ?? null, artist_url: r.artist_href ?? null, source: r.source_url ?? null });
+    },
+  },
+  {
+    category: "random", slug: "animegif", kind: "json",
+    title: "GIF Reaksi Anime",
+    description: "GIF reaksi anime acak untuk perintah bot seperti peluk, tepuk, atau tampar. Menyertakan judul anime asalnya.",
+    params: [{ name: "aksi", description: "Mis. hug, pat, kiss, slap, cry, dance, wave. Default acak.", example: "hug" }, redirectParam],
+    handler: async ({ sp }) => {
+      const aksi = opt(sp, "aksi").toLowerCase() || pick(NEKOS_GIF);
+      if (!NEKOS_GIF.includes(aksi)) throw new HttpError(400, `Aksi tidak dikenal. Pilihan: ${NEKOS_GIF.join(", ")}.`);
+      const r = await nekos(aksi);
+      return imageOut(sp, { action: aksi, image: r.url, anime: r.anime_name ?? null });
+    },
+  },
+  {
+    category: "random", slug: "pemandangan", kind: "json",
+    title: "Pemandangan",
+    description: "Foto pemandangan alam resolusi tinggi secara acak: gunung, pantai, hutan, senja, dan lainnya.",
+    params: [{ name: "tema", description: `Pilihan: ${Object.keys(SCENERY).join(", ")}. Default acak.`, example: "gunung" }, redirectParam],
+    handler: async ({ sp }) => {
+      const tema = opt(sp, "tema", "acak").toLowerCase().replace(/\s+/g, "_");
+      const q = SCENERY[tema];
+      if (!q) throw new HttpError(400, `Tema tidak dikenal. Pilihan: ${Object.keys(SCENERY).join(", ")}.`);
+      return imageOut(sp, { theme: tema, ...wallOut(await wallhaven(q, "100")) });
+    },
+  },
+  {
+    category: "random", slug: "wallpaper", kind: "json",
+    title: "Wallpaper",
+    description: "Wallpaper acak minimal Full HD untuk ponsel atau desktop. Bisa disaring dengan kata kunci dan kategori.",
+    params: [
+      { name: "q", description: "Kata kunci opsional, sebaiknya bahasa Inggris.", example: "cyberpunk" },
+      { name: "kategori", description: "umum, anime, atau semua. Default semua.", example: "anime" },
+      { name: "orientasi", description: "desktop atau hp. Default desktop.", example: "desktop" },
+      redirectParam,
+    ],
+    handler: async ({ sp }) => {
+      const kat = opt(sp, "kategori", "semua").toLowerCase();
+      const hp = opt(sp, "orientasi", "desktop").toLowerCase() === "hp";
+      const w = await wallhaven(opt(sp, "q").slice(0, 80), kat === "anime" ? "010" : kat === "umum" ? "100" : "110", hp ? "1080x1920&ratios=portrait" : "1920x1080&ratios=landscape");
+      return imageOut(sp, wallOut(w));
+    },
+  },
+  {
+    category: "random", slug: "cat", kind: "json",
+    title: "Foto Kucing",
+    description: "Foto kucing acak yang menggemaskan beserta ukuran gambarnya.",
+    params: [redirectParam],
+    handler: async ({ sp }) => {
+      const d = await fetchJson<{ id: string; url: string; width: number; height: number }[]>("https://api.thecatapi.com/v1/images/search");
+      if (!d[0]?.url) throw new HttpError(502, "Sumber gambar tidak mengirim hasil.");
+      return imageOut(sp, { image: d[0].url, width: d[0].width, height: d[0].height });
+    },
+  },
+  {
+    category: "random", slug: "fox", kind: "json",
+    title: "Foto Rubah",
+    description: "Foto rubah acak dari randomfox.ca.",
+    params: [redirectParam],
+    handler: async ({ sp }) => {
+      const d = await fetchJson<{ image?: string; link?: string }>("https://randomfox.ca/floof/");
+      if (!d.image) throw new HttpError(502, "Sumber gambar tidak mengirim hasil.");
+      return imageOut(sp, { image: d.image, source: d.link ?? null });
+    },
+  },
+  {
+    category: "random", slug: "meme", kind: "json",
+    title: "Meme",
+    description: "Meme acak dari Reddit. Default mengambil dari komunitas Indonesia; bisa diganti ke subreddit lain.",
+    params: [{ name: "subreddit", description: "Nama subreddit sumber. Default indonesia.", example: "indonesia" }, redirectParam],
+    handler: async ({ sp }) => {
+      const sub = opt(sp, "subreddit", "indonesia").replace(/[^A-Za-z0-9_]/g, "").slice(0, 30) || "indonesia";
+      type M = { postLink?: string; subreddit?: string; title?: string; url?: string; nsfw?: boolean; spoiler?: boolean; author?: string; ups?: number; code?: number; message?: string };
+      for (let i = 0; i < 3; i++) {
+        const d = await fetchJson<M>(`https://meme-api.com/gimme/${sub}`);
+        if (!d.url) throw new HttpError(404, d.message ?? "Subreddit tidak ditemukan atau tidak punya meme bergambar.");
+        if (d.nsfw || d.spoiler) continue;
+        return imageOut(sp, { title: d.title ?? null, image: d.url, subreddit: d.subreddit ?? sub, author: d.author ?? null, upvotes: d.ups ?? 0, source: d.postLink ?? null });
+      }
+      throw new HttpError(404, "Tidak menemukan meme yang aman dari subreddit tersebut. Coba lagi.");
+    },
+  },
+];
+
+randomEndpoints.push(...moreEndpoints);

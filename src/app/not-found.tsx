@@ -5,21 +5,13 @@ export const metadata: Metadata = { title: "Halaman tidak ditemukan", robots: { 
 
 export default function NotFound() {
   return (
-    <section className="grain relative isolate flex min-h-[80vh] items-center justify-center overflow-hidden px-5 pt-24 text-center">
-      <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
-        <div className="aurora aurora-1 left-1/2 top-1/4 h-[480px] w-[480px] -translate-x-1/2" />
-        <div className="grid-lines absolute inset-0" />
-      </div>
-      <div>
-        <p className="font-mono text-sm text-ember">HTTP 404</p>
-        <h1 className="mt-4 font-display text-6xl font-semibold tracking-[-0.04em] sm:text-8xl">
-          Endpoint <span className="font-serif font-normal italic text-muted">tersesat.</span>
-        </h1>
-        <p className="mx-auto mt-6 max-w-md text-muted">Halaman yang kamu cari tidak ada atau sudah dipindahkan. Kembali ke beranda atau lihat daftar endpoint yang tersedia.</p>
-        <div className="mt-10 flex justify-center gap-3">
-          <Link href="/" className="btn-primary rounded-full px-7 py-3.5 text-sm font-semibold">Ke beranda</Link>
-          <Link href="/docs" className="btn-ghost rounded-full px-7 py-3.5 text-sm font-medium">Buka dokumentasi</Link>
-        </div>
+    <section className="mx-auto max-w-6xl px-4 py-24 sm:px-6 lg:py-32">
+      <p className="font-mono text-sm font-bold text-danger">HTTP 404</p>
+      <h1 className="mt-4 max-w-[18ch] font-mono text-[2rem] font-bold leading-tight tracking-tight sm:text-5xl">Halaman ini tidak ada.</h1>
+      <p className="mt-6 max-w-[55ch] text-lg text-muted">Alamatnya salah ketik atau halamannya sudah dipindahkan. Kembali ke beranda, atau cari endpoint yang kamu butuhkan di dokumentasi.</p>
+      <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+        <Link href="/docs" className="btn btn-primary">Buka dokumentasi</Link>
+        <Link href="/" className="btn btn-secondary">Ke beranda</Link>
       </div>
     </section>
   );

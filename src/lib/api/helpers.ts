@@ -45,7 +45,7 @@ export async function fetchRaw(url: string, init?: RequestInit, timeoutMs = 1200
       ...init,
       signal: ctrl.signal,
       cache: "no-store",
-      headers: { "user-agent": "YanxzAPI/1.0 (+https://github.com/yanxz)", ...(init?.headers ?? {}) },
+      headers: { "user-agent": "YanzAPI/1.0", ...(init?.headers ?? {}) },
     });
     if (res.status === 404) throw new HttpError(404, "Data tidak ditemukan di server sumber.");
     if (!res.ok) throw new HttpError(502, `Server sumber merespons dengan status ${res.status}.`);

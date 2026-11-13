@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import { getStore } from "@/db/store";
 import type { Endpoint } from "./types";
 import { HttpError } from "./types";
+import { SITE_URL } from "@/lib/site";
 import { binaryResponse, fetchJson, fetchRaw, need, normalizeHex, num, opt, parseHttpUrl } from "./helpers";
 
 /* ---------- kalkulator aman (tanpa eval) ---------- */
@@ -140,13 +141,24 @@ function shortCode(len = 6) {
   return Array.from(bytes, (b) => BASE62[b % BASE62.length]).join("");
 }
 
+/** Ukuran viewport [lebar, tinggi] untuk tiap perangkat screenshot. */
+const SHOT_DEVICES: Record<string, [number, number]> = {
+  desktop: [1920, 1080],
+  laptop: [1366, 768],
+  tablet: [820, 1180],
+  mobile: [390, 844],
+};
+const SHOT_ALIAS: Record<string, string> = {
+  pc: "desktop", komputer: "desktop", hp: "mobile", ponsel: "mobile", phone: "mobile", android: "mobile", iphone: "mobile", ipad: "tablet", tab: "tablet",
+};
+
 export const toolsEndpoints: Endpoint[] = [
   {
     category: "tools", slug: "qrcode", kind: "image",
     title: "QR Code Generator",
     description: "Ubah teks atau tautan apa pun menjadi gambar QR Code PNG dengan warna dan ukuran yang bisa diatur.",
     params: [
-      { name: "text", required: true, description: "Teks atau URL yang akan dijadikan QR.", example: "https://yanxz.dev" },
+      { name: "text", required: true, description: "Teks atau URL yang akan dijadikan QR.", example: SITE_URL },
       { name: "size", description: "Lebar gambar dalam piksel (128–1024).", example: "512" },
       { name: "dark", description: "Warna modul QR (hex tanpa #).", example: "111111" },
       { name: "light", description: "Warna latar (hex tanpa #).", example: "ffffff" },
@@ -165,23 +177,40 @@ export const toolsEndpoints: Endpoint[] = [
   {
     category: "tools", slug: "screenshot", kind: "image",
     title: "Screenshot Website",
-    description: "Ambil tangkapan layar halaman web dan terima hasilnya sebagai gambar.",
+    description: "Ambil tangkapan layar halaman web seperti tampil di perangkat pilihan: desktop, laptop, tablet, atau mobile (HP). Hasilnya langsung berupa gambar.",
     params: [
       { name: "url", required: true, description: "Alamat website.", example: "https://nextjs.org" },
-      { name: "width", description: "Lebar viewport (320–1920).", example: "1280" },
+      {
+        name: "device",
+        description: "Perangkat: desktop (1920x1080), laptop (1366x768), tablet (820x1180), atau mobile (390x844). Default desktop.",
+        example: "desktop",
+        options: Object.keys(SHOT_DEVICES),
+      },
     ],
     handler: async ({ sp }) => {
       const u = parseHttpUrl(need(sp, "url", 500));
-      const w = Math.round(num(sp, "width", 1280, 320, 1920));
-      const res = await fetchRaw(`https://image.thum.io/get/width/${w}/crop/${Math.round(w * 0.5625)}/noanimate/${u.toString()}`, undefined, 30000);
+      const raw = opt(sp, "device").toLowerCase().replace(/[^a-z]/g, "");
+      let vw: number;
+      let vh: number;
+      if (!raw && opt(sp, "width")) {
+        // Parameter lama: tetap dilayani supaya pemanggil lama tidak rusak.
+        vw = Math.round(num(sp, "width", 1280, 320, 1920));
+        vh = Math.round(vw * 0.5625);
+      } else {
+        const name = SHOT_ALIAS[raw] ?? (raw || "desktop");
+        const dev = SHOT_DEVICES[name];
+        if (!dev) throw new HttpError(400, `Parameter 'device' tidak dikenal. Pilihan: ${Object.keys(SHOT_DEVICES).join(", ")}.`);
+        [vw, vh] = dev;
+      }
+      const res = await fetchRaw(`https://image.thum.io/get/viewportWidth/${vw}/width/${vw}/crop/${vh}/noanimate/${u.toString()}`, undefined, 30000);
       const buf = await res.arrayBuffer();
       return binaryResponse(buf, res.headers.get("content-type") ?? "image/png", "public, max-age=600");
     },
   },
   {
     category: "tools", slug: "shorturl", kind: "json",
-    title: "Pemendek URL (Yanxz)",
-    description: "Pemendek URL bawaan Yanxz API. Hasilnya tautan pendek di domain ini yang langsung bisa dipakai dan dihitung kliknya. URL yang sama selalu mendapat kode yang sama.",
+    title: "Pemendek URL (yanz.api)",
+    description: "Pemendek URL bawaan yanz.api. Hasilnya tautan pendek di domain ini yang langsung bisa dipakai dan dihitung kliknya. URL yang sama selalu mendapat kode yang sama.",
     params: [{ name: "url", required: true, description: "URL panjang yang akan dipendekkan.", example: "https://nextjs.org/docs/app/getting-started" }],
     handler: async ({ sp, origin }) => {
       const u = parseHttpUrl(need(sp, "url", 2000)).toString();
@@ -195,7 +224,7 @@ export const toolsEndpoints: Endpoint[] = [
         throw new HttpError(503, "Database pemendek URL sedang tidak dapat dihubungi. Coba lagi nanti.");
       }
       if (!link) throw new HttpError(500, "Gagal membuat tautan pendek.");
-      return { original: u, short: `${origin}/s/${link.code}`, code: link.code, hits: link.hits, provider: "yanxz" };
+      return { original: u, short: `${origin}/s/${link.code}`, code: link.code, hits: link.hits, provider: "yanz.api" };
     },
   },
   {
@@ -280,7 +309,7 @@ export const toolsEndpoints: Endpoint[] = [
     title: "Base64",
     description: "Encode atau decode teks Base64 dengan dukungan UTF-8 penuh.",
     params: [
-      { name: "text", required: true, description: "Teks input.", example: "Halo Yanxz API" },
+      { name: "text", required: true, description: "Teks input.", example: "Halo yanz.api" },
       { name: "mode", description: "encode atau decode. Default: encode.", example: "encode" },
     ],
     handler: async ({ sp }) => {
@@ -298,7 +327,7 @@ export const toolsEndpoints: Endpoint[] = [
     category: "tools", slug: "hash", kind: "json",
     title: "Hash Generator",
     description: "Hitung hash MD5, SHA-1, SHA-256, dan SHA-512 dari sebuah teks sekaligus.",
-    params: [{ name: "text", required: true, description: "Teks yang di-hash.", example: "yanxz" }],
+    params: [{ name: "text", required: true, description: "Teks yang di-hash.", example: "yanz" }],
     handler: async ({ sp }) => {
       const text = need(sp, "text");
       const h = (a: string) => crypto.createHash(a).update(text).digest("hex");
@@ -356,7 +385,7 @@ export const toolsEndpoints: Endpoint[] = [
     title: "JSON Formatter",
     description: "Validasi JSON lalu rapikan (pretty) atau kecilkan (minify) ukurannya.",
     params: [
-      { name: "json", required: true, description: "String JSON.", example: '{"nama":"yanxz","fitur":[1,2,3]}' },
+      { name: "json", required: true, description: "String JSON.", example: '{"nama":"yanz","fitur":[1,2,3]}' },
       { name: "indent", description: "Jumlah spasi indentasi (0–8). Default 2.", example: "2" },
     ],
     handler: async ({ sp }) => {

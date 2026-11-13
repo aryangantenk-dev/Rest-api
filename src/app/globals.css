@@ -1,294 +1,404 @@
 @import "tailwindcss";
 
+/*
+  Sistem desain yanz.api
+  Gaya   : Minimalism & Swiss (sudut tajam, tanpa bayangan/gradien, satu aksen).
+  Warna  : "code dark + endpoint green" dengan pasangan tema terang yang setara.
+  Huruf  : JetBrains Mono (judul, kode) + IBM Plex Sans (isi).
+  Semua pasangan teks/latar di bawah sudah diukur >= 4.5:1; batas kontrol >= 3:1.
+*/
+
 :root {
-  --bg: #0b0a09;
-  --surface: #131110;
-  --surface-2: #1a1714;
-  --line: rgba(255, 238, 220, 0.09);
-  --line-strong: rgba(255, 238, 220, 0.18);
-  --fg: #f3ede4;
-  --muted: #a69e92;
-  --dim: #6f685e;
-  --ember: #ff6b3d;
-  --amber: #ffb454;
-  --mint: #8be3b5;
-  --rose: #ff8f8f;
+  color-scheme: light;
+
+  --bg: #f8fafc;
+  --card: #ffffff;
+  --subtle: #eef2f6;
+  --fg: #0f172a;
+  --muted: #475569;
+  --line: #d5dce5;
+  --control: #64748b;
+  --accent: #22c55e;
+  --accent-hover: #16a34a;
+  --accent-edge: #15803d;
+  --on-accent: #0f172a;
+  --ok: #14763a;
+  --danger: #b91c1c;
+  --ring: #0f172a;
+
+  /* Permukaan kode selalu gelap supaya warna sintaks cukup satu set. */
+  --code: #0b1120;
+  --code-fg: #e2e8f0;
+  --code-muted: #94a3b8;
+  --code-line: #334155;
+  --code-ok: #4ade80;
+  --code-danger: #f87171;
+
+  /* Token gerak: dipilih menurut jarak dan peran, bukan satu durasi untuk semua. */
+  --dur-press: 100ms;
+  --dur-fast: 150ms;
+  --dur-enter: 220ms;
+  --dur-exit: 140ms;
+  --dur-reveal: 320ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+
+  --header-h: 4rem;
+}
+
+/* Tema gelap: mengikuti sistem, kecuali pengguna memilih sendiri lewat tombol tema. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #020617;
+    --card: #0e1223;
+    --subtle: #1a1e2f;
+    --fg: #f8fafc;
+    --muted: #94a3b8;
+    --line: #334155;
+    --control: #64748b;
+    --accent: #22c55e;
+    --accent-hover: #4ade80;
+    --accent-edge: #22c55e;
+    --on-accent: #0f172a;
+    --ok: #4ade80;
+    --danger: #f87171;
+    --ring: #ffffff;
+    --code: #0b1120;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #020617;
+  --card: #0e1223;
+  --subtle: #1a1e2f;
+  --fg: #f8fafc;
+  --muted: #94a3b8;
+  --line: #334155;
+  --control: #64748b;
+  --accent: #22c55e;
+  --accent-hover: #4ade80;
+  --accent-edge: #22c55e;
+  --on-accent: #0f172a;
+  --ok: #4ade80;
+  --danger: #f87171;
+  --ring: #ffffff;
+  --code: #0b1120;
 }
 
 @theme inline {
   --color-bg: var(--bg);
-  --color-surface: var(--surface);
-  --color-surface2: var(--surface-2);
-  --color-line: var(--line);
-  --color-linestrong: var(--line-strong);
+  --color-card: var(--card);
+  --color-subtle: var(--subtle);
   --color-fg: var(--fg);
   --color-muted: var(--muted);
-  --color-dim: var(--dim);
-  --color-ember: var(--ember);
-  --color-amber: var(--amber);
-  --color-mint: var(--mint);
-  --color-rose: var(--rose);
-  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-head), ui-sans-serif, system-ui, sans-serif;
-  --font-serif: var(--font-accent), ui-serif, Georgia, serif;
-  --font-mono: var(--font-code), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --color-line: var(--line);
+  --color-control: var(--control);
+  --color-accent: var(--accent);
+  --color-onaccent: var(--on-accent);
+  --color-ok: var(--ok);
+  --color-danger: var(--danger);
+  --color-ring: var(--ring);
+  --color-code: var(--code);
+  --color-codefg: var(--code-fg);
+  --color-codemuted: var(--code-muted);
+  --color-codeline: var(--code-line);
+  --color-codeok: var(--code-ok);
+  --color-codedanger: var(--code-danger);
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-code), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+/* ---------- Dasar ---------- */
 html {
-  scroll-behavior: smooth;
-  scroll-padding-top: 90px;
   background: var(--bg);
+  /* Header dan kolom cari menempel di atas; beri ruang agar elemen yang difokus tidak tertutup. */
+  scroll-padding-top: calc(var(--header-h) + 5.5rem);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  overflow-x: hidden;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+p {
+  text-wrap: pretty;
 }
 
 ::selection {
-  background: rgba(255, 107, 61, 0.35);
-  color: #fff;
-}
-
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #2a2520;
-  border-radius: 10px;
-  border: 2px solid var(--bg);
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #3a332c;
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 :focus-visible {
-  outline: 2px solid var(--ember);
-  outline-offset: 3px;
-  border-radius: 6px;
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 
-/* ---------- Tekstur & latar ---------- */
-.grain::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.07;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+/* Kolom di dalam pembungkus yang sudah menggambar cincin fokus lewat :focus-within.
+   Cincinnya pindah ke pembungkus, bukan dihilangkan. */
+.ring-on-parent:focus-visible {
+  outline: none;
 }
 
-.grid-lines {
-  background-image:
-    linear-gradient(to right, rgba(255, 238, 220, 0.045) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 238, 220, 0.045) 1px, transparent 1px);
-  background-size: 64px 64px;
-  mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 30%, transparent 75%);
-  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 30%, transparent 75%);
+a,
+button,
+summary,
+select,
+label[for] {
+  touch-action: manipulation;
+}
+button:not(:disabled),
+summary,
+select {
+  cursor: pointer;
 }
 
-.aurora {
-  position: absolute;
-  border-radius: 9999px;
-  filter: blur(90px);
-  will-change: transform;
-}
-.aurora-1 {
-  background: radial-gradient(circle, rgba(255, 107, 61, 0.5), transparent 65%);
-  animation: drift-a 22s ease-in-out infinite alternate;
-}
-.aurora-2 {
-  background: radial-gradient(circle, rgba(255, 180, 84, 0.32), transparent 65%);
-  animation: drift-b 26s ease-in-out infinite alternate;
-}
-.aurora-3 {
-  background: radial-gradient(circle, rgba(139, 227, 181, 0.16), transparent 65%);
-  animation: drift-c 30s ease-in-out infinite alternate;
+.tnum {
+  font-variant-numeric: tabular-nums;
 }
 
-.text-ember-gradient {
-  background: linear-gradient(100deg, #ff6b3d 10%, #ffb454 90%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-/* ---------- Kartu dengan sorotan kursor ---------- */
-.spot {
-  position: relative;
-  isolation: isolate;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  transition: border-color 0.35s ease, transform 0.45s cubic-bezier(0.2, 0.7, 0.2, 1);
-}
-.spot::before {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  background: radial-gradient(360px circle at var(--mx, 50%) var(--my, 0%), rgba(255, 130, 70, 0.16), transparent 60%);
-  opacity: 0;
-  transition: opacity 0.4s ease;
-  z-index: -1;
-  pointer-events: none;
-}
-.spot:hover {
-  border-color: var(--line-strong);
-}
-.spot:hover::before {
-  opacity: 1;
+/* URL, id, dan token panjang boleh patah di mana saja; prosa biasa tidak. */
+.wrap-anywhere {
+  overflow-wrap: anywhere;
 }
 
 /* ---------- Tombol ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0 1.25rem;
+  border: 1px solid transparent;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  transition:
+    background-color var(--dur-fast) ease-out,
+    border-color var(--dur-fast) ease-out,
+    color var(--dur-fast) ease-out,
+    transform var(--dur-press) ease-out;
+}
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 .btn-primary {
-  position: relative;
-  overflow: hidden;
-  background: var(--fg);
-  color: #14110e;
-  transition: transform 0.25s ease, box-shadow 0.35s ease;
+  background: var(--accent);
+  border-color: var(--accent-edge);
+  color: var(--on-accent);
 }
-.btn-primary::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(105deg, transparent 30%, rgba(255, 107, 61, 0.45) 50%, transparent 70%);
-  transform: translateX(-120%);
-  transition: transform 0.7s ease;
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
 }
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 40px -10px rgba(255, 107, 61, 0.55);
+.btn-secondary {
+  background: transparent;
+  border-color: var(--control);
+  color: var(--fg);
 }
-.btn-primary:hover::after {
-  transform: translateX(120%);
-}
-.btn-ghost {
-  border: 1px solid var(--line-strong);
-  transition: background 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
-}
-.btn-ghost:hover {
-  background: rgba(255, 238, 220, 0.06);
-  border-color: rgba(255, 238, 220, 0.3);
-  transform: translateY(-2px);
+.btn-secondary:hover:not(:disabled) {
+  background: var(--subtle);
 }
 
-/* ---------- Scroll reveal ---------- */
-.reveal {
-  opacity: 0;
-  transform: translateY(26px);
-  filter: blur(6px);
-  transition: opacity 0.9s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1), filter 0.9s ease;
-  transition-delay: var(--d, 0ms);
+/* Tautan teks di dalam paragraf */
+.link {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  transition: color var(--dur-fast) ease-out;
 }
-.reveal.in {
+.link:hover {
+  color: var(--ok);
+}
+
+/* ---------- Kolom isian ---------- */
+.field {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--control);
+  background: var(--card);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  /* 16px mencegah iOS memperbesar halaman saat kolom difokus. */
+  font-size: 1rem;
+  line-height: 1.4;
+  transition: border-color var(--dur-fast) ease-out;
+}
+.field::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+.field:hover {
+  border-color: var(--fg);
+}
+.field[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+/* ---------- Panel buka/tutup ----------
+   Hanya opacity dan transform yang dianimasikan (tinggi tidak), dan menutup lebih
+   cepat daripada membuka. Jangan dinamai `.collapse`: bentrok dengan utility Tailwind. */
+.panel {
+  display: none;
+  opacity: 0;
+  transform: translateY(-0.375rem);
+  transition:
+    opacity var(--dur-exit) var(--ease-in),
+    transform var(--dur-exit) var(--ease-in),
+    display var(--dur-exit) allow-discrete;
+}
+.panel[data-open="true"] {
+  display: block;
   opacity: 1;
   transform: none;
-  filter: none;
+  transition:
+    opacity var(--dur-enter) var(--ease-out),
+    transform var(--dur-enter) var(--ease-out),
+    display var(--dur-enter) allow-discrete;
+}
+@starting-style {
+  .panel[data-open="true"] {
+    opacity: 0;
+    transform: translateY(-0.375rem);
+  }
 }
 
-/* Kata-kata judul muncul bertahap */
-.word {
-  display: inline-block;
-  opacity: 0;
-  transform: translateY(0.5em);
-  filter: blur(8px);
-  animation: word-in 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
-  animation-delay: calc(var(--i) * 70ms + 150ms);
+/* ---------- Menu filter kategori ----------
+   Daftar vertikal selebar wadahnya. Seluruh baris bisa diklik; lingkaran di kanan
+   hanya penanda pilihan. Semua warna diambil dari token tema, jadi menunya ikut
+   tema terang dan gelap seperti kartu endpoint di sebelahnya. */
+.cat-menu {
+  background: var(--card);
+  color: var(--fg);
+  border: 1px solid var(--line);
 }
-
-.fade-up {
-  opacity: 0;
-  animation: fade-up 1s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
-  animation-delay: var(--d, 0ms);
+.cat-heading,
+.cat-label {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.4;
 }
-
-/* ---------- Marquee ---------- */
-.marquee {
+.cat-heading {
+  padding: 0.875rem 1.25rem;
+  border-bottom: 1px solid var(--line);
+}
+.cat-row {
   display: flex;
-  width: max-content;
-  animation: marquee 60s linear infinite;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 3.5rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--line);
+  color: var(--fg);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
-.marquee.rev {
-  animation-direction: reverse;
-  animation-duration: 75s;
+/* Hover berada di antara warna kartu dan warna baris terpilih, supaya keduanya
+   tidak tertukar. */
+.cat-row:hover {
+  background: color-mix(in srgb, var(--subtle) 50%, var(--card));
 }
-.marquee-wrap:hover .marquee {
-  animation-play-state: paused;
+.cat-row[data-selected="true"] {
+  background: var(--subtle);
 }
-.marquee-mask {
-  mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+/* Cincin fokus digambar di dalam baris supaya tidak terpotong tepi menu. */
+.cat-row:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
 }
-
-/* ---------- Misc ---------- */
-.no-scrollbar {
-  scrollbar-width: none;
+.cat-list > li:last-child > .cat-row,
+button.cat-row[aria-expanded="false"] {
+  border-bottom-color: transparent;
 }
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-
-.caret::after {
-  content: "";
-  display: inline-block;
-  width: 7px;
-  height: 1.05em;
-  margin-left: 2px;
-  vertical-align: -0.15em;
-  background: var(--ember);
-  animation: blink 1s steps(1) infinite;
-}
-
-.live-dot {
-  position: relative;
-  width: 8px;
-  height: 8px;
-  border-radius: 9999px;
-  background: var(--mint);
-}
-.live-dot::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: var(--mint);
-  animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
-}
-
-/* Catatan: jangan dinamai `.collapse` — bentrok dengan utility Tailwind (visibility: collapse)
-   yang membuat isi panel tidak terlihat. */
-.accordion-panel {
+.cat-radio {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 0.45s cubic-bezier(0.2, 0.7, 0.2, 1);
+  place-items: center;
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid var(--control);
+  border-radius: 9999px;
+  transition: all 0.2s ease;
 }
-.accordion-panel.open {
-  grid-template-rows: 1fr;
+/* Pilihan ditandai dengan titik isi, bukan warna saja. Warnanya `--accent-edge`
+   karena hijau aksen terlalu pucat sebagai batas kontrol di tema terang. */
+.cat-radio::after {
+  content: "";
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 9999px;
+  background: var(--accent-edge);
+  opacity: 0;
+  transform: scale(0);
+  transition: all 0.2s ease;
 }
-.accordion-panel > div {
-  overflow: hidden;
-  min-height: 0;
-  min-width: 0;
+.cat-row[data-selected="true"] .cat-radio {
+  border-color: var(--accent-edge);
+}
+.cat-row[data-selected="true"] .cat-radio::after {
+  opacity: 1;
+  transform: none;
+}
+/* Di layar lebar daftarnya selalu terbuka; tombol lipat hanya ada di layar kecil.
+   Kalau layarnya pendek, yang bergulir hanya daftarnya: judul "Kategori" tetap di
+   tempat dan bilah gulirnya tipis serta berada di dalam bingkai menu. */
+@media (min-width: 64rem) {
+  .cat-menu {
+    display: flex;
+    flex-direction: column;
+    /* 4.5rem = jarak atas halaman (3rem) + sela bawah (1.5rem), supaya menu tidak
+       menempel ke tepi bawah layar sebelum halaman digulir. */
+    max-height: calc(100dvh - var(--header-h) - 4.5rem);
+  }
+  .cat-list.panel {
+    display: block;
+    opacity: 1;
+    transform: none;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--control) transparent;
+  }
+  /* Disembunyikan di sini, bukan lewat utility: aturan `.cat-row` di atas tidak
+     berada di dalam layer, jadi `lg:hidden` akan kalah darinya. */
+  button.cat-row {
+    display: none;
+  }
 }
 
-.json-key { color: #ffb454; }
-.json-str { color: #8be3b5; }
-.json-num { color: #ff8f6a; }
-.json-bool { color: #e6a8ff; }
-.json-null { color: #8c857a; }
-
-.response-in {
-  animation: fade-up 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+.chev {
+  transition: transform var(--dur-enter) var(--ease-out);
+}
+[aria-expanded="true"] > .chev,
+details[open] > summary .chev {
+  transform: rotate(180deg);
 }
 
 details > summary {
@@ -297,61 +407,87 @@ details > summary {
 details > summary::-webkit-details-marker {
   display: none;
 }
-details[open] .faq-plus {
-  transform: rotate(45deg);
+details[open] > .faq-body {
+  animation: enter var(--dur-enter) var(--ease-out) both;
 }
 
+/* Isi yang baru datang (respons, tab kode, hasil pencarian) */
+.enter {
+  animation: enter var(--dur-enter) var(--ease-out) both;
+}
+
+/* Daftar yang masuk berurutan saat terlihat. Kelas `stagger-wait` hanya dipasang oleh
+   skrip pada daftar yang masih di bawah layar, jadi tanpa JavaScript isinya tetap tampil. */
+.stagger-wait > * {
+  opacity: 0;
+  transform: translateY(0.75rem);
+}
+.stagger-go > * {
+  animation: enter-up var(--dur-reveal) var(--ease-out) both;
+  animation-delay: calc(min(var(--i, 0), 12) * 40ms);
+}
+
+.spin {
+  animation: spin 0.7s linear infinite;
+}
+
+/* ---------- Sintaks JSON (di atas permukaan kode gelap) ---------- */
+.json-key { color: #93c5fd; }
+.json-str { color: #86efac; }
+.json-num { color: #fdba74; }
+.json-bool { color: #c4b5fd; }
+.json-null { color: #94a3b8; }
+
 /* ---------- Keyframes ---------- */
-@keyframes drift-a {
-  from { transform: translate3d(-8%, -6%, 0) scale(1); }
-  to { transform: translate3d(14%, 12%, 0) scale(1.25); }
-}
-@keyframes drift-b {
-  from { transform: translate3d(10%, 4%, 0) scale(1.1); }
-  to { transform: translate3d(-14%, 16%, 0) scale(0.9); }
-}
-@keyframes drift-c {
-  from { transform: translate3d(0, 10%, 0) scale(0.9); }
-  to { transform: translate3d(-10%, -12%, 0) scale(1.2); }
-}
-@keyframes word-in {
-  to { opacity: 1; transform: none; filter: blur(0); }
-}
-@keyframes fade-up {
-  from { opacity: 0; transform: translateY(18px); }
+@keyframes enter {
+  from { opacity: 0; transform: translateY(0.375rem); }
   to { opacity: 1; transform: none; }
 }
-@keyframes marquee {
-  to { transform: translateX(-50%); }
-}
-@keyframes blink {
-  50% { opacity: 0; }
-}
-@keyframes ping {
-  75%, 100% { transform: scale(2.6); opacity: 0; }
-}
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+@keyframes enter-up {
+  from { opacity: 0; transform: translateY(0.75rem); }
+  to { opacity: 1; transform: none; }
 }
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
 
-.float-slow {
-  animation: float 7s ease-in-out infinite;
-}
-
+/* ---------- Gerak dikurangi ---------- */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.001ms !important;
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
-  .reveal, .word, .fade-up {
-    opacity: 1 !important;
-    transform: none !important;
-    filter: none !important;
+  .stagger-wait > * {
+    opacity: 1;
+    transform: none;
   }
+  /* Indikator memuat tetap berputar pelan agar statusnya terbaca. */
+  .spin {
+    animation-duration: 1.4s !important;
+    animation-iteration-count: infinite !important;
+  }
+}
+
+/* ---------- Ikon tombol tema ---------- */
+.only-dark {
+  display: none;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .only-light {
+    display: none;
+  }
+  :root:not([data-theme="light"]) .only-dark {
+    display: block;
+  }
+}
+:root[data-theme="dark"] .only-light {
+  display: none;
+}
+:root[data-theme="dark"] .only-dark {
+  display: block;
 }

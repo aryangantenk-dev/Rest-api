@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CopyButton, useOrigin } from "./client-utils";
 
-type Props = { fallback: string; path: string; label?: string };
+type Props = { fallback: string; path: string };
 
 export function buildSnippets(url: string) {
   return {
@@ -24,37 +24,38 @@ print_r($data["result"]);`,
   } as Record<string, string>;
 }
 
-export function CodeTabs({ fallback, path, label = "contoh permintaan" }: Props) {
+export function CodeTabs({ fallback, path }: Props) {
   const origin = useOrigin(fallback);
   const snippets = buildSnippets(`${origin}${path}`);
   const tabs = Object.keys(snippets);
   const [tab, setTab] = useState(tabs[0]);
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-linestrong bg-[#0f0d0c]">
-      <div className="flex items-center justify-between border-b border-line pl-2 pr-3">
-        <div role="tablist" aria-label="Bahasa pemrograman" className="flex">
-          {tabs.map((t) => (
-            <button
-              key={t}
-              role="tab"
-              aria-selected={tab === t}
-              onClick={() => setTab(t)}
-              className={`relative px-3.5 py-3 text-xs font-medium transition-colors ${tab === t ? "text-fg" : "text-dim hover:text-muted"}`}
-            >
-              {t}
-              <span className={`absolute inset-x-3 bottom-0 h-px bg-ember transition-opacity ${tab === t ? "opacity-100" : "opacity-0"}`} />
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-1">
-          <span className="hidden font-mono text-[10px] uppercase tracking-widest text-dim sm:block">{label}</span>
-          <CopyButton text={snippets[tab]} />
-        </div>
+    <div className="bg-code text-codefg">
+      <div role="tablist" aria-label="Bahasa pemrograman" className="flex flex-wrap border-b border-codeline">
+        {tabs.map((t) => (
+          <button
+            key={t}
+            type="button"
+            role="tab"
+            id={`tab-${t}`}
+            aria-selected={tab === t}
+            aria-controls="panel-kode"
+            onClick={() => setTab(t)}
+            className={`relative min-h-11 px-3 text-sm font-medium transition-colors duration-150 sm:px-4 ${tab === t ? "text-codefg" : "text-codemuted hover:text-codefg"}`}
+          >
+            {t}
+            {tab === t && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-accent" aria-hidden />}
+          </button>
+        ))}
       </div>
-      <pre key={tab} className="response-in overflow-x-auto p-5 font-mono text-[13px] leading-relaxed text-[#d8d0c3]">
-        <code>{snippets[tab]}</code>
-      </pre>
+      {/* Tombol salin berada di samping kode, bukan di baris tab, supaya tab tidak terlipat di layar sempit. */}
+      <div className="flex items-start">
+        <pre id="panel-kode" role="tabpanel" aria-labelledby={`tab-${tab}`} tabIndex={0} key={tab} className="enter min-w-0 flex-1 overflow-x-auto p-4 font-mono text-sm leading-relaxed">
+          <code>{snippets[tab]}</code>
+        </pre>
+        <CopyButton text={snippets[tab]} tone="code" className="mt-1" />
+      </div>
     </div>
   );
 }

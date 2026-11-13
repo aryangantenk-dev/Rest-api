@@ -1,4 +1,4 @@
--- Skema Yanxz API untuk Supabase (backend REST).
+-- Skema yanz.api untuk Supabase (backend REST).
 -- Jalankan sekali di SQL Editor Supabase. Aman dijalankan ulang.
 --
 -- RLS aktif tanpa policy, jadi tabel hanya bisa diakses dengan service role /
@@ -20,6 +20,15 @@ create table if not exists public.short_links (
 
 create index if not exists short_links_url_idx on public.short_links using hash (url);
 
+-- IP yang diblokir karena melewati batas permintaan berulang kali.
+-- Buka blokir: hapus barisnya di sini, atau panggil /api/admin/unban.
+create table if not exists public.banned_ips (
+  ip varchar(64) primary key,
+  reason text not null default '',
+  created_at timestamp not null default now()
+);
+
+alter table public.banned_ips enable row level security;
 alter table public.api_stats enable row level security;
 alter table public.short_links enable row level security;
 

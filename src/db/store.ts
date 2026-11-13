@@ -1,6 +1,6 @@
 import { desc, eq, sql } from "drizzle-orm";
 import { getDb, hasDatabase } from "./index";
-import { apiStats, shortLinks } from "./schema";
+import { apiStats, bannedIps, shortLinks } from "./schema";
 
 /**
  * Penyimpanan untuk statistik pemakaian dan pemendek URL. Dua backend didukung:
@@ -24,7 +24,13 @@ export interface Store {
   shorten(url: string, code: string): Promise<{ code: string; hits: number } | null>;
   /** Mengembalikan URL tujuan dan menambah hitungan klik, atau null bila kode tidak dikenal. */
   resolve(code: string): Promise<string | null>;
+  /** Daftar IP yang diblokir. */
+  listBans(): Promise<Ban[]>;
+  banIp(ip: string, reason: string): Promise<void>;
+  unbanIp(ip: string): Promise<void>;
 }
+
+export type Ban = { ip: string; reason: string; created_at: string | null };
 
 /* ---------- Supabase (PostgREST) ---------- */
 
@@ -51,8 +57,39 @@ function supabaseStore(): Store {
     }
   }
 
+  async function table<T>(method: string, query: string, body?: unknown, prefer?: string): Promise<T> {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    try {
+      const res = await fetch(`${supabaseUrl}/rest/v1/${query}`, {
+        method,
+        headers: {
+          apikey: supabaseKey,
+          authorization: `Bearer ${supabaseKey}`,
+          "content-type": "application/json",
+          ...(prefer ? { prefer } : {}),
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        cache: "no-store",
+        signal: ctrl.signal,
+      });
+      if (!res.ok) throw new Error(`Supabase ${method} ${query.split("?")[0]} gagal (${res.status})`);
+      const text = await res.text();
+      return (text ? JSON.parse(text) : null) as T;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   return {
     kind: "supabase",
+    listBans: async () => (await table<Ban[] | null>("GET", "banned_ips?select=ip,reason,created_at&order=created_at.desc&limit=5000")) ?? [],
+    async banIp(ip, reason) {
+      await table("POST", "banned_ips?on_conflict=ip", { ip, reason: reason.slice(0, 300) }, "resolution=merge-duplicates,return=minimal");
+    },
+    async unbanIp(ip) {
+      await table("DELETE", `banned_ips?ip=eq.${encodeURIComponent(ip)}`, undefined, "return=minimal");
+    },
     async ping() {
       await rpc("api_stats_summary");
     },
@@ -78,6 +115,19 @@ function postgresStore(): Store {
   };
   return {
     kind: "postgres",
+    async listBans() {
+      const rows = await (await db()).select().from(bannedIps).orderBy(desc(bannedIps.createdAt)).limit(5000);
+      return rows.map((r) => ({ ip: r.ip, reason: r.reason, created_at: r.createdAt?.toISOString() ?? null }));
+    },
+    async banIp(ip, reason) {
+      await (await db())
+        .insert(bannedIps)
+        .values({ ip, reason: reason.slice(0, 300) })
+        .onConflictDoUpdate({ target: bannedIps.ip, set: { reason: reason.slice(0, 300) } });
+    },
+    async unbanIp(ip) {
+      await (await db()).delete(bannedIps).where(eq(bannedIps.ip, ip));
+    },
     async ping() {
       await (await db()).execute(sql`select 1`);
     },
