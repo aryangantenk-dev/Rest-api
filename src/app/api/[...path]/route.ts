@@ -7,7 +7,8 @@ import { APPEAL_URL, OWNER_WA, RATE_LIMIT, clientIp, guard } from "@/lib/guard";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// Sebagian besar endpoint selesai dalam beberapa detik; batas ini dibuat longgar untuk build APK (tools/web2apk).
+export const maxDuration = 120;
 
 const CORS = {
   "access-control-allow-origin": "*",

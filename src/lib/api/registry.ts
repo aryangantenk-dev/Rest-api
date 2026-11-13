@@ -14,6 +14,7 @@ import { searchEndpoints } from "./search";
 import { downloaderEndpoints } from "./downloader";
 import { gamesEndpoints } from "./games";
 import { mediaToolEndpoints } from "./mediatools";
+import { web2apkEndpoints } from "./web2apk";
 import { categories } from "./categories";
 
 export const endpoints: Endpoint[] = [
@@ -33,6 +34,7 @@ export const endpoints: Endpoint[] = [
   ...filmEndpoints,
   // Kategorinya beragam; urutan per kategori diatur ulang oleh allMeta().
   ...mediaToolEndpoints,
+  ...web2apkEndpoints,
 ];
 
 const index = new Map(endpoints.map((e) => [`${e.category}/${e.slug}`, e]));

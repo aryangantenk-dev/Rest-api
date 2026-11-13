@@ -20,7 +20,7 @@ export const categories: Category[] = [
     id: "tools",
     name: "Tools",
     tagline: "Utilitas developer harian",
-    description: "Kumpulan alat bantu: QR Code, pemendek URL, penerjemah, kalkulator, hash, DNS, dan info IP.",
+    description: "Kumpulan alat bantu: QR Code, pemendek URL, penerjemah, kalkulator, hash, DNS, info IP, dan web ke APK.",
     seoTitle: "REST API Tools: QR Code, Short URL, Translate, Hash, DNS",
   },
   {

@@ -1,6 +1,6 @@
 # yanz.api
 
-REST API gratis tanpa API key (160 endpoint) beserta dokumentasi dan playground interaktif. Dibangun dengan Next.js 16 (App Router).
+REST API gratis tanpa API key (161 endpoint) beserta dokumentasi dan playground interaktif. Dibangun dengan Next.js 16 (App Router).
 
 ## Menjalankan lokal
 
@@ -25,6 +25,7 @@ Kode berada langsung di root repository, jadi Vercel maupun Netlify mendeteksiny
 | `RATE_LIMIT_PER_MIN` | Batas permintaan per menit untuk setiap IP. Default `45`. |
 | `BAN_AFTER_STRIKES` | Jumlah pelanggaran dalam 10 menit sebelum IP diblokir permanen. Default `3`. |
 | `OWNER_WHATSAPP` | Nomor WhatsApp owner untuk banding blokir. Default `62895403334081`. |
+| `WEB2APK_API_KEY` | Kunci API dari akunmu sendiri di layanan pembuat APK, untuk `/api/tools/web2apk`. Akun gratis mendapat 3 build per hari. Tanpa ini endpoint berjalan sebagai tamu (1 build per hari per alamat IP server), lalu menjawab 429. |
 
 Tanpa database, semua endpoint lain tetap berjalan normal. Lihat `.env.example`. Status database bisa dicek di `/api/health`.
 
