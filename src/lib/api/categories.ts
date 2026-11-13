@@ -34,7 +34,7 @@ export const categories: Category[] = [
     id: "image",
     name: "Image",
     tagline: "Gambar dibuat on-the-fly",
-    description: "Hasilkan gambar PNG secara dinamis: placeholder, avatar inisial, text-to-picture, dan wallpaper gradien.",
+    description: "Hasilkan dan olah gambar secara dinamis: placeholder, avatar inisial, text-to-picture, wallpaper gradien, serta efek piksel, lego, dan blur.",
     seoTitle: "REST API Image: Placeholder, Avatar, Text to Picture",
   },
   {

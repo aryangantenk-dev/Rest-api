@@ -25,6 +25,7 @@ const FONT_FILES: [string, string, Weight][] = [
   ["Narrow", "archivo-narrow-latin-700-normal.woff", 700],
   ["Mono", "jetbrains-mono-latin-400-normal.woff", 400],
   ["Mono", "jetbrains-mono-latin-700-normal.woff", 700],
+  ["Nokia", "nokia-6000-medium.ttf", 400],
 ];
 
 let fontsPromise: Promise<Font[]> | null = null;
@@ -40,6 +41,19 @@ function loadFonts(): Promise<Font[]> {
     });
   }
   return fontsPromise;
+}
+
+/** Gambar dasar (template) untuk beberapa kanvas, dibaca sekali lalu disimpan sebagai data URI. */
+const templates = new Map<string, Promise<string>>();
+
+function loadTemplate(file: string, type: string): Promise<string> {
+  let hit = templates.get(file);
+  if (!hit) {
+    hit = readFile(path.join(process.cwd(), "src", "assets", "canvas", file)).then((buf) => `data:${type};base64,${buf.toString("base64")}`);
+    hit.catch(() => templates.delete(file));
+    templates.set(file, hit);
+  }
+  return hit;
 }
 
 async function renderBuffer(node: ReactElement, width: number, height: number): Promise<Buffer> {
@@ -168,6 +182,156 @@ async function encodeMp4(frames: Buffer[], width: number, height: number, hold: 
 }
 
 /* ------------------------------------------------------------------ */
+/* Patrick memegang papan (gambar dan video)                            */
+/* ------------------------------------------------------------------ */
+
+/** Ukuran asli template dan letak area tulis di papannya. Semua ukuran lain diskalakan dari sini. */
+const PATRICK = { w: 1122, h: 1402, box: { x: 214, y: 615, w: 702, h: 401 } };
+
+const patrickText = (sp: URLSearchParams) => cleanText(need(sp, "text", 250)).replace(/\s+/g, " ").trim();
+
+function patrickFont(text: string, width: number): number {
+  const k = width / PATRICK.w;
+  return fitFont(text, PATRICK.box.w * k, PATRICK.box.h * k, 0.6, 1.18, Math.round(120 * k), Math.round(24 * k));
+}
+
+function patrickNode(text: string, template: string, width: number, fontSize: number): ReactElement {
+  const k = width / PATRICK.w;
+  const height = Math.round(PATRICK.h * k);
+  return (
+    <div style={{ display: "flex", position: "relative", width, height, background: "#ffffff" }}>
+      {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text */}
+      <img src={template} width={width} height={height} style={{ position: "absolute", left: 0, top: 0 }} />
+      <div
+        style={{
+          position: "absolute",
+          left: PATRICK.box.x * k,
+          top: PATRICK.box.y * k,
+          width: PATRICK.box.w * k,
+          height: PATRICK.box.h * k,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          textAlign: "center",
+          overflow: "hidden",
+          fontFamily: "Inter",
+          fontWeight: 800,
+          fontSize,
+          lineHeight: 1.18,
+          color: "#111111",
+          wordBreak: "break-word",
+        }}
+      >
+        {text}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Efek piksel dan lego                                                 */
+/* ------------------------------------------------------------------ */
+
+type Pixels = { data: Buffer; width: number; height: number };
+
+/**
+ * Unduh gambar pengguna lalu jadikan piksel RGBA, sisi terpanjang 768 px.
+ * Perender dipakai sebagai dekoder supaya JPG, PNG, GIF, dan WebP diterima tanpa pustaka tambahan:
+ * gambar dipaskan ke kanvas persegi transparan, lalu tepi kosongnya dipotong.
+ */
+async function loadPixels(raw: string): Promise<Pixels> {
+  const src = await loadImage(raw, 5_000_000);
+  const side = 768;
+  const png = PNG.sync.read(
+    await renderBuffer(
+      <div style={{ ...fill, alignItems: "center", justifyContent: "center" }}>
+        {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text */}
+        <img src={src} width={side} height={side} style={{ objectFit: "contain" }} />
+      </div>,
+      side,
+      side,
+    ),
+  );
+  let x0 = side, y0 = side, x1 = -1, y1 = -1;
+  for (let y = 0; y < side; y++) {
+    for (let x = 0; x < side; x++) {
+      if (png.data[(y * side + x) * 4 + 3] > 8) {
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
+    }
+  }
+  if (x1 < x0 || y1 < y0) throw new HttpError(400, "Gambar kosong atau tidak bisa dibaca. Coba tautan JPG atau PNG lain.");
+  const width = x1 - x0 + 1;
+  const height = y1 - y0 + 1;
+  const data = Buffer.alloc(width * height * 4);
+  for (let y = 0; y < height; y++) png.data.copy(data, y * width * 4, ((y + y0) * side + x0) * 4, ((y + y0) * side + x0 + width) * 4);
+  return { data, width, height };
+}
+
+/**
+ * Ganti tiap kotak `block`×`block` piksel dengan warna rata-ratanya. `shade` (bila ada) memberi
+ * faktor terang/gelap per piksel di dalam kotak, dipakai untuk membentuk tonjolan lego.
+ * Sisa piksel di tepi yang tidak genap satu kotak dibuang.
+ */
+function mosaic(img: Pixels, block: number, shade?: (u: number, v: number) => number): Buffer {
+  const cols = Math.max(1, Math.floor(img.width / block));
+  const rows = Math.max(1, Math.floor(img.height / block));
+  const b = Math.min(block, img.width, img.height);
+  const ox = Math.floor((img.width - cols * b) / 2);
+  const oy = Math.floor((img.height - rows * b) / 2);
+  const out = new PNG({ width: cols * b, height: rows * b });
+  const table = shade ? Float32Array.from({ length: b * b }, (_, i) => shade(i % b, Math.floor(i / b))) : null;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      let sr = 0, sg = 0, sb = 0, sa = 0;
+      for (let v = 0; v < b; v++) {
+        for (let u = 0; u < b; u++) {
+          const i = ((oy + r * b + v) * img.width + ox + c * b + u) * 4;
+          const a = img.data[i + 3];
+          sr += img.data[i] * a;
+          sg += img.data[i + 1] * a;
+          sb += img.data[i + 2] * a;
+          sa += a;
+        }
+      }
+      const red = sa ? sr / sa : 0, green = sa ? sg / sa : 0, blue = sa ? sb / sa : 0;
+      const alpha = Math.round(sa / (b * b));
+      for (let v = 0; v < b; v++) {
+        for (let u = 0; u < b; u++) {
+          const o = ((r * b + v) * out.width + c * b + u) * 4;
+          const f = table ? table[v * b + u] : 1;
+          out.data[o] = Math.min(255, Math.round(red * f));
+          out.data[o + 1] = Math.min(255, Math.round(green * f));
+          out.data[o + 2] = Math.min(255, Math.round(blue * f));
+          out.data[o + 3] = alpha;
+        }
+      }
+    }
+  }
+  return PNG.sync.write(out);
+}
+
+/** Bentuk satu keping lego dilihat dari atas: tepi keping lebih gelap, tonjolan bundar dengan sisi terang di kiri atas. */
+function legoShade(block: number): (u: number, v: number) => number {
+  const mid = (block - 1) / 2;
+  const radius = block * 0.3;
+  const rim = Math.max(1, block * 0.07);
+  return (u, v) => {
+    const dx = u - mid, dy = v - mid;
+    const d = Math.hypot(dx, dy);
+    if (d <= radius - rim) return 1.1;
+    if (d <= radius) return 1.1 - ((dx + dy) / (radius * Math.SQRT2)) * 0.32;
+    if (d <= radius + rim * 1.6 && dx + dy > 0) return 0.86;
+    if (u === 0 || v === 0) return 1.14;
+    if (u === block - 1 || v === block - 1) return 0.74;
+    return 1;
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* Util                                                                 */
 /* ------------------------------------------------------------------ */
 
@@ -265,6 +429,54 @@ function fitFont(text: string, w: number, h: number, ratio: number, lineHeight: 
 
 const wibTime = () =>
   new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Jakarta" }).format(new Date());
+
+const wibDate = () => new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Asia/Jakarta" }).format(new Date());
+
+/** Lebar tiap huruf ASCII (32–126) pada font Nokia, dalam 1/32 ukuran huruf, ditulis sebagai digit basis 36. */
+const NOKIA_ADVANCE = "76cmemi6aaie6a6egegggggggg66ececkgieieegiaagekiigiigiigmiigaeaeaaggcggcgg68g6mggggaecggmggea6ag";
+const NOKIA_SPACING = 5;
+const NOKIA_LINE = 1.34;
+
+/** Lebar teks satu baris pada font Nokia. Huruf di luar ASCII digambar dengan font cadangan, jadi dikira-kira lebar. */
+function nokiaWidth(text: string, size: number, spacing = NOKIA_SPACING): number {
+  let width = 0;
+  for (const ch of text) {
+    const code = ch.codePointAt(0) ?? 0;
+    const em = code >= 32 && code < 127 ? parseInt(NOKIA_ADVANCE[code - 32], 36) / 32 : 0.75;
+    width += em * size + spacing;
+  }
+  return width;
+}
+
+/** Jumlah baris setelah teks dilipat pada lebar `maxWidth`, meniru cara perender melipat kata. */
+function nokiaLines(text: string, size: number, maxWidth: number): number {
+  const space = nokiaWidth(" ", size);
+  let lines = 0;
+  for (const para of text.split("\n")) {
+    let used = 0;
+    lines++;
+    for (const word of para.split(" ").filter(Boolean)) {
+      const w = nokiaWidth(word, size);
+      if (w > maxWidth) {
+        // Kata yang lebih panjang dari satu baris dipotong huruf demi huruf.
+        for (const ch of word) {
+          const cw = nokiaWidth(ch, size);
+          if (used + cw > maxWidth) {
+            lines++;
+            used = 0;
+          }
+          used += cw;
+        }
+      } else if (used && used + space + w > maxWidth) {
+        lines++;
+        used = w;
+      } else {
+        used += (used ? space : 0) + w;
+      }
+    }
+  }
+  return lines;
+}
 
 const cleanText = (s: string) => s.replace(/\r/g, "").replace(/[\u0000-\u0008\u000b-\u001f]/g, "");
 
@@ -400,6 +612,121 @@ export const canvasEndpoints: Endpoint[] = [
       }
       const video = await encodeMp4(frames, 512, 512, hold, BRAT_FPS * 2);
       return binaryResponse(video, "video/mp4", "public, max-age=86400");
+    },
+  },
+  {
+    category: "canvas", slug: "bratpatrick", kind: "image",
+    title: "Brat Patrick",
+    description: "Patrick memegang papan putih berisi teksmu. Ukuran huruf menyesuaikan panjang teks. Hasil PNG 840×1050.",
+    params: [{ name: "text", required: true, description: "Teks di papan (maks 250 karakter).", example: "aku capek jadi orang baik" }],
+    handler: async ({ sp }) => {
+      const text = patrickText(sp);
+      const template = await loadTemplate("patrick.png", "image/png");
+      return render(patrickNode(text, template, 840, patrickFont(text, 840)), 840, 1050);
+    },
+  },
+  {
+    category: "canvas", slug: "bratvidpatrick", kind: "video",
+    title: "Brat Video Patrick",
+    description: "Versi video dari Brat Patrick: teks di papan muncul kata demi kata. Hasil MP4 560×700 tanpa suara.",
+    params: [
+      { name: "text", required: true, description: "Teks di papan (maks 250 karakter).", example: "aku capek jadi orang baik" },
+      { name: "jeda", description: "Jeda antar kata dalam milidetik, 200–1500. Default 500.", example: "500" },
+    ],
+    handler: async ({ sp }) => {
+      const text = patrickText(sp);
+      const words = text.split(" ");
+      const hold = Math.max(2, Math.round(num(sp, "jeda", 500, 200, 1500) / (1000 / BRAT_FPS)));
+      const template = await loadTemplate("patrick.png", "image/png");
+      // Ukuran huruf dihitung dari teks lengkap supaya tidak berubah-ubah selama video berjalan.
+      const fontSize = patrickFont(text, 560);
+      const step = Math.ceil(words.length / BRAT_MAX_STEPS);
+      const frames: Buffer[] = [];
+      for (let n = step; n < words.length + step; n += step) {
+        frames.push(PNG.sync.read(await renderBuffer(patrickNode(words.slice(0, n).join(" "), template, 560, fontSize), 560, 700)).data);
+      }
+      return binaryResponse(await encodeMp4(frames, 560, 700, hold, BRAT_FPS * 2), "video/mp4", "public, max-age=86400");
+    },
+  },
+  {
+    category: "canvas", slug: "nokia", kind: "image",
+    title: "Pesan Nokia",
+    description: "Layar pesan masuk ala ponsel Nokia jadul, lengkap dengan huruf piksel, nama pengirim, tanggal, dan jam. Hasil PNG 1086×1448.",
+    params: [
+      { name: "text", required: true, description: "Isi pesan (maks 300 karakter). Baris baru didukung.", example: "Teruslah bekerja walaupun belum nampak hasilnya. Minimal kelihatan sibuk." },
+      { name: "judul", description: "Tulisan di bagian atas layar (maks 14 karakter). Default Pesan.", example: "Pesan" },
+      { name: "dari", description: "Nama pengirim (maks 24 karakter). Default Teman.", example: "Teman" },
+      { name: "tanggal", description: "Tanggal pesan. Default hari ini (WIB).", example: "05/06/2026" },
+      { name: "jam", description: "Jam pesan. Default jam sekarang (WIB).", example: "00:17" },
+    ],
+    handler: async ({ sp }) => {
+      const text = cleanText(need(sp, "text", 300)).replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+      const title = cleanText(opt(sp, "judul", "Pesan")).replace(/\s+/g, " ").trim().slice(0, 14) || "Pesan";
+      const meta = [
+        "Dari:",
+        cleanText(opt(sp, "dari", "Teman")).replace(/\s+/g, " ").trim().slice(0, 24) || "Teman",
+        cleanText(opt(sp, "tanggal")).replace(/\s+/g, " ").trim().slice(0, 20) || wibDate(),
+        cleanText(opt(sp, "jam")).replace(/\s+/g, " ").trim().slice(0, 10) || wibTime(),
+      ];
+      const bg = await loadTemplate("nokia.jpg", "image/jpeg");
+      // Huruf digambar 1,3× lebih tinggi seperti layar aslinya, jadi tinggi area dihitung sebelum ditarik.
+      const stretch = 1.3;
+      const bodyW = 1026;
+      const bodyH = Math.floor(640 / stretch);
+      let size = 63;
+      for (; size > 24; size -= 1) {
+        if (nokiaLines(text, size, bodyW * 0.97) * size * NOKIA_LINE <= bodyH) break;
+      }
+      const titleSize = Math.min(120, Math.floor(760 / nokiaWidth(title, 1, 0)));
+      const tall: CSSProperties = { transform: `scaleY(${stretch})`, transformOrigin: "top left", fontFamily: "Nokia", color: "#000000", letterSpacing: NOKIA_SPACING };
+      return render(
+        <div style={{ display: "flex", position: "relative", width: 1086, height: 1448, background: "#d3e0e8" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text */}
+          <img src={bg} width={1086} height={1448} style={{ position: "absolute", left: 0, top: 0 }} />
+          <div style={{ position: "absolute", left: 143, top: 130, width: 800, height: 140, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Nokia", fontSize: titleSize, color: "#eaf2f2", textShadow: "2px 0 0 #eaf2f2" }}>
+            {title}
+          </div>
+          <div style={{ ...tall, position: "absolute", left: 60, top: 320, width: bodyW, height: bodyH, display: "flex", overflow: "hidden", fontSize: size, lineHeight: NOKIA_LINE, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+            {text}
+          </div>
+          <div style={{ ...tall, position: "absolute", left: 60, top: 980, width: bodyW, display: "flex", flexDirection: "column", fontSize: 48, lineHeight: `${Math.round(80 / stretch)}px` }}>
+            {meta.map((line, i) => (
+              <div key={i} style={{ display: "flex", whiteSpace: "nowrap" }}>
+                {line}
+              </div>
+            ))}
+          </div>
+        </div>,
+        1086,
+        1448,
+      );
+    },
+  },
+  {
+    category: "image", slug: "pixel", kind: "image",
+    title: "Efek Piksel",
+    description: "Ubah gambar menjadi mosaik piksel ala game 8-bit. Atur besar kotaknya sesuka hati. Hasil PNG, sisi terpanjang 768 px.",
+    params: [
+      { name: "url", required: true, description: "Tautan langsung ke gambar (JPG, PNG, GIF, atau WebP), maks 5 MB.", example: "https://github.com/github.png" },
+      { name: "ukuran", description: "Besar satu kotak dalam piksel, 4–64. Makin besar makin kasar. Default 12.", example: "12" },
+    ],
+    handler: async ({ sp }) => {
+      const img = await loadPixels(need(sp, "url", 1000));
+      return binaryResponse(mosaic(img, Math.round(num(sp, "ukuran", 12, 4, 64))), "image/png", "public, max-age=86400");
+    },
+  },
+  {
+    category: "image", slug: "lego", kind: "image",
+    title: "Efek Lego",
+    description: "Ubah gambar menjadi susunan keping lego dilihat dari atas, tiap keping satu warna. Hasil PNG, sisi terpanjang 768 px.",
+    params: [
+      { name: "url", required: true, description: "Tautan langsung ke gambar (JPG, PNG, GIF, atau WebP), maks 5 MB.", example: "https://github.com/github.png" },
+      { name: "ukuran", description: "Besar satu keping dalam piksel, 8–64. Default 16.", example: "16" },
+    ],
+    handler: async ({ sp }) => {
+      const img = await loadPixels(need(sp, "url", 1000));
+      const block = Math.min(Math.round(num(sp, "ukuran", 16, 8, 64)), img.width, img.height);
+      return binaryResponse(mosaic(img, block, legoShade(block)), "image/png", "public, max-age=86400");
     },
   },
   {
