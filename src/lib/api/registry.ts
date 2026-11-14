@@ -15,6 +15,7 @@ import { downloaderEndpoints } from "./downloader";
 import { gamesEndpoints } from "./games";
 import { mediaToolEndpoints } from "./mediatools";
 import { web2apkEndpoints } from "./web2apk";
+import { toUrlEndpoints } from "./tourl";
 import { categories } from "./categories";
 
 export const endpoints: Endpoint[] = [
@@ -35,6 +36,7 @@ export const endpoints: Endpoint[] = [
   // Kategorinya beragam; urutan per kategori diatur ulang oleh allMeta().
   ...mediaToolEndpoints,
   ...web2apkEndpoints,
+  ...toUrlEndpoints,
 ];
 
 const index = new Map(endpoints.map((e) => [`${e.category}/${e.slug}`, e]));
@@ -51,6 +53,7 @@ export function toMeta(e: Endpoint): EndpointMeta {
     description: e.description,
     params: e.params,
     kind: e.kind,
+    ...(e.upload ? { upload: e.upload } : {}),
     path: `/api/${e.category}/${e.slug}`,
   };
 }

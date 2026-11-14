@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import type { EndpointMeta } from "@/lib/api/types";
 import type { Category } from "@/lib/api/categories";
 import { colorizeJson } from "@/lib/highlight";
-import { buildSnippets } from "./code-tabs";
+import { buildSnippets, buildUploadSnippets } from "./code-tabs";
 import { CopyButton, LoadedImage, REDIRECT_FAILED, asksRedirect, loadImage, useOrigin } from "./client-utils";
 import { CategoryIcon, ChevronIcon, PlayIcon, SearchIcon } from "./icons";
 
@@ -39,6 +39,8 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
   const [mounted, setMounted] = useState(false);
   const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(e.params.map((p) => [p.name, p.example ?? ""])));
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  /** Berkas yang dipilih, untuk endpoint yang menerima unggahan. */
+  const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [res, setRes] = useState<Result | null>(null);
   const [tab, setTab] = useState<"respons" | "kode">("respons");
@@ -91,6 +93,25 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
       }
     };
     try {
+      if (e.upload && file) {
+        forget();
+        if (file.size > e.upload.maxBytes) {
+          setRes({ ok: false, status: 0, ms: 0, type: "", error: `Berkas terlalu besar: maksimal ${Math.round(e.upload.maxBytes / 1024 / 1024)} MB.` });
+          return;
+        }
+        const form = new FormData();
+        form.append(e.upload.field, file);
+        const r = await fetch(e.path, { method: "POST", body: form });
+        const raw = await r.text();
+        let text = raw;
+        try {
+          text = JSON.stringify(JSON.parse(raw), null, 2);
+        } catch {
+          /* bukan JSON, mis. halaman galat dari platform hosting */
+        }
+        setRes({ ok: r.ok, status: r.status, ms: Math.round(performance.now() - t0), type: r.headers.get("content-type") ?? "", text, size: raw.length });
+        return;
+      }
       if (asksRedirect(url)) {
         const el = await loadImage(url, `Hasil ${e.title}`, "max-h-80 max-w-full border border-codeline bg-white/5");
         if (el) {
@@ -129,7 +150,7 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
     } finally {
       setLoading(false);
     }
-  }, [e.path, query]);
+  }, [e.path, e.title, e.upload, file, query]);
 
   const onSubmit = (ev: FormEvent) => {
     ev.preventDefault();
@@ -144,7 +165,10 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
     void send();
   };
 
-  const snippets = buildSnippets(fullUrl);
+  // Endpoint unggahan: contoh POST ditampilkan bila berkas dipilih atau belum ada parameter yang diisi.
+  const posting = !!e.upload && (!!file || !query);
+  const snippets = e.upload && posting ? buildUploadSnippets(`${origin}${e.path}`, e.upload.field) : buildSnippets(fullUrl);
+  const shownUrl = e.upload && file ? `${origin}${e.path}` : fullUrl;
 
   return (
     <article ref={ref} id={id} className={`scroll-mt-36 border bg-card transition-colors duration-150 ${isOpen ? "border-control" : "border-line hover:border-control"}`}>
@@ -160,7 +184,7 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
           }}
           className="flex min-h-14 w-full items-start gap-3 p-3 text-left sm:gap-4 sm:p-4"
         >
-          <span className="mt-0.5 shrink-0 font-mono text-sm font-bold text-ok">GET</span>
+          <span className="mt-0.5 shrink-0 font-mono text-sm font-bold text-ok">{e.upload ? "GET/POST" : "GET"}</span>
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
               <span className="text-base font-semibold">{e.title}</span>
@@ -178,6 +202,30 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
           <div className="grid grid-cols-1 border-t border-line lg:grid-cols-2">
             {/* kiri: parameter */}
             <form onSubmit={onSubmit} noValidate className="min-w-0 space-y-5 p-4 sm:p-5">
+              {e.upload && (
+                <div>
+                  <label htmlFor={`${id}-file`} className="flex flex-wrap items-center gap-2">
+                    <code className="font-mono text-sm font-bold">{e.upload.field}</code>
+                    <span className="text-xs text-muted">berkas, lewat POST</span>
+                  </label>
+                  <p id={`${id}-file-help`} className="mt-1 text-sm text-muted">
+                    {e.upload.description}
+                  </p>
+                  <input
+                    id={`${id}-file`}
+                    type="file"
+                    accept={e.upload.accept}
+                    aria-describedby={`${id}-file-help`}
+                    onChange={(ev) => setFile(ev.target.files?.[0] ?? null)}
+                    className="field mt-2 h-auto py-2 file:mr-3 file:border-0 file:bg-subtle file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-fg"
+                  />
+                  {file && (
+                    <p className="mt-1 text-sm text-muted">
+                      Berkas ini yang dikirim; parameter di bawah diabaikan.
+                    </p>
+                  )}
+                </div>
+              )}
               {e.params.length ? (
                 <fieldset className="space-y-4">
                   <legend className="text-sm font-semibold">Parameter query</legend>
@@ -242,8 +290,8 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
               )}
 
               <div className="flex items-center border border-line bg-bg">
-                <code className="wrap-anywhere min-w-0 flex-1 px-3 py-2 font-mono text-sm text-muted">{fullUrl}</code>
-                <CopyButton text={fullUrl} label="URL" />
+                <code className="wrap-anywhere min-w-0 flex-1 px-3 py-2 font-mono text-sm text-muted">{shownUrl}</code>
+                <CopyButton text={shownUrl} label="URL" />
               </div>
 
               <button type="submit" disabled={loading} className="btn btn-primary w-full sm:w-auto">

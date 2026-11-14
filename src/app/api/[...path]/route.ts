@@ -12,7 +12,7 @@ export const maxDuration = 120;
 
 const CORS = {
   "access-control-allow-origin": "*",
-  "access-control-allow-methods": "GET, OPTIONS",
+  "access-control-allow-methods": "GET, POST, OPTIONS",
   "access-control-allow-headers": "*",
 };
 
@@ -24,12 +24,26 @@ export async function OPTIONS() {
   return new Response(null, { status: 204, headers: CORS });
 }
 
-export async function GET(req: Request, ctx: { params: Promise<{ path: string[] }> }) {
+type RouteCtx = { params: Promise<{ path: string[] }> };
+
+export function GET(req: Request, ctx: RouteCtx) {
+  return handle(req, ctx);
+}
+
+/** POST hanya untuk endpoint yang menerima unggahan berkas (lihat `upload` di definisi endpoint). */
+export function POST(req: Request, ctx: RouteCtx) {
+  return handle(req, ctx);
+}
+
+async function handle(req: Request, ctx: RouteCtx) {
   const { path } = await ctx.params;
   const key = path.join("/").toLowerCase();
   const endpoint = findEndpoint(key);
   if (!endpoint) {
     return fail(404, `Endpoint '/api/${key}' tidak ditemukan. Lihat daftar lengkap di /docs atau GET /api.`);
+  }
+  if (req.method === "POST" && !endpoint.upload) {
+    return fail(405, `Endpoint '/api/${key}' hanya menerima GET.`, { allow: "GET, OPTIONS" });
   }
 
   const ip = clientIp(req);

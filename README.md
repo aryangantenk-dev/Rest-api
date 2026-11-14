@@ -1,6 +1,6 @@
 # yanz.api
 
-REST API gratis tanpa API key (162 endpoint) beserta dokumentasi dan playground interaktif. Dibangun dengan Next.js 16 (App Router).
+REST API gratis tanpa API key (163 endpoint) beserta dokumentasi dan playground interaktif. Dibangun dengan Next.js 16 (App Router).
 
 ## Menjalankan lokal
 
@@ -26,6 +26,8 @@ Kode berada langsung di root repository, jadi Vercel maupun Netlify mendeteksiny
 | `BAN_AFTER_STRIKES` | Jumlah pelanggaran dalam 10 menit sebelum IP diblokir permanen. Default `3`. |
 | `OWNER_WHATSAPP` | Nomor WhatsApp owner untuk banding blokir. Default `62895403334081`. |
 | `WEB2APK_API_KEY` | Kunci API dari akunmu sendiri di layanan pembuat APK, untuk `/api/tools/web2apk`. Akun gratis mendapat 3 build per hari. Tanpa ini endpoint berjalan sebagai tamu (1 build per hari per alamat IP server), lalu menjawab 429. |
+| `IMAGE_TTL_DAYS` | Berapa hari gambar unggahan (`/api/tools/tourl`) disimpan sebelum dihapus otomatis. Default `30`; `0` berarti selamanya. Fitur ini butuh `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`. |
+| `IMAGE_BUCKET` | Nama bucket Supabase Storage untuk gambar unggahan. Default `yanz-images`; dibuat otomatis. |
 
 Tanpa database, semua endpoint lain tetap berjalan normal. Lihat `.env.example`. Status database bisa dicek di `/api/health`.
 
@@ -88,6 +90,20 @@ Akinator dan Tic Tac Toe juga tanpa sesi: simpan nilai `session` (Akinator) atau
 | --- | --- |
 | `/api/tools/shorturl?url=…` | Bawaan yanz.api. Tautan pendek di domain sendiri (`/s/<kode>`) dengan hitungan klik. Butuh database. |
 | `/api/tools/tinyurl?url=…&alias=…` | Lewat TinyURL (`tinyurl.com`). Tanpa database, `alias` opsional. |
+
+## Gambar ke URL
+
+Unggah gambar, dapat tautan yang bisa dibagikan di domain sendiri (`/i/<kode>.<ext>`).
+
+| Cara | Contoh |
+| --- | --- |
+| Unggah berkas (POST multipart, field `file`) | `curl -F "file=@foto.jpg" https://domainmu/api/tools/tourl` |
+| Salin dari tautan (GET) | `/api/tools/tourl?url=https://…/gambar.png` |
+
+- Hanya PNG, JPG, GIF, dan WebP, maksimal 4 MB. Jenisnya diperiksa dari isi berkas, bukan dari namanya.
+- Disimpan di Supabase Storage (bucket privat) selama `IMAGE_TTL_DAYS` hari, lalu dihapus otomatis.
+- Batas unggah 10 gambar per 10 menit per IP, di luar batas permintaan umum.
+- Owner bisa melihat 100 unggahan terbaru di `/api/admin/images?key=…` dan menghapus satu gambar dengan `/api/admin/delimage?name=<nama berkas>&key=…`. Gambar yang dihapus bisa masih tampil dari cache paling lama satu jam.
 
 ## Scraper Komik (komiku.org)
 
