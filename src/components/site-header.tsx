@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "./auth-client";
+import { Avatar } from "./avatar";
 import { CloseIcon, LogoMark, MenuIcon, MoonIcon, SunIcon, UserIcon } from "./icons";
 
 const links = [
@@ -41,7 +42,7 @@ function ThemeToggle() {
 export function SiteHeader({ authEnabled = false }: { authEnabled?: boolean }) {
   const pathname = usePathname();
   // Memuat sesi sekali per halaman; hasilnya memperbarui atribut data-signed yang dipakai tombol akun.
-  useAuth(authEnabled);
+  const auth = useAuth(authEnabled);
   // Menu seluler terikat ke halaman tempat ia dibuka, jadi otomatis tertutup saat berpindah halaman.
   const [openAt, setOpenAt] = useState<string | null>(null);
   const open = openAt === pathname;
@@ -93,14 +94,15 @@ export function SiteHeader({ authEnabled = false }: { authEnabled?: boolean }) {
                 href="/login"
                 onClick={() => setOpen(false)}
                 aria-current={pathname === "/login" ? "page" : undefined}
-                // Di halaman login tombol utamanya ada di formulir, jadi tombol ini tidak ikut menonjol.
-                className={`only-guest btn relative min-w-[5.75rem] px-3 ${pathname === "/login" ? "btn-secondary" : "btn-primary"}`}
+                // Di halaman login dan daftar tombol utamanya ada di formulir, jadi tombol ini tidak ikut menonjol.
+                className={`only-guest btn relative min-w-[5.75rem] px-3 ${pathname === "/login" || pathname === "/daftar" ? "btn-secondary" : "btn-primary"}`}
               >
                 Masuk
                 {pathname === "/login" && <span className="absolute inset-x-0 -bottom-2 h-0.5 bg-fg" aria-hidden />}
               </Link>
               <Link href="/akun" onClick={() => setOpen(false)} aria-current={pathname === "/akun" ? "page" : undefined} className="only-signed btn btn-secondary relative min-w-[5.75rem] px-3">
-                <UserIcon />
+                {/* Foto profil menggantikan ikon bila sudah diatur; lebar tombol tetap (min-w). */}
+                {auth.user?.photo ? <Avatar photo={auth.user.photo} name={auth.user.username} className="h-6 w-6 text-xs" /> : <UserIcon />}
                 Akun
                 {pathname === "/akun" && <span className="absolute inset-x-0 -bottom-2 h-0.5 bg-fg" aria-hidden />}
               </Link>

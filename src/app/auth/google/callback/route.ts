@@ -33,7 +33,10 @@ export async function GET(req: Request) {
     if (!email) return back("google_failed");
     const user = await login(email, profile.name, /^https:\/\//.test(profile.picture) ? profile.picture : "", "google");
     if (user.banned) return back("banned");
-    return go(safeNext(saved.next), sessionCookie(user.id, secure));
+    const dest = safeNext(saved.next);
+    // Username wajib: akun yang belum punya diarahkan mengisinya dulu di /akun, lalu lanjut ke tujuan semula.
+    const first = user.username || dest === "/akun" ? dest : `/akun?next=${encodeURIComponent(dest)}`;
+    return go(first, sessionCookie(user.id, secure));
   } catch (e) {
     console.error("[auth/google]", e instanceof Error ? e.message : e);
     return back("google_failed");

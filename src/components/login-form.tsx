@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { setSession, useAuth, type AuthUser } from "./auth-client";
+import { setSession, useAuth, type SessionBody } from "./auth-client";
 import { ArrowIcon, GoogleIcon, MailIcon } from "./icons";
+import { UsernameField, useUsername } from "./username-field";
 
 const QUERY_ERRORS: Record<string, string> = {
   google_off: "Login Google belum diaktifkan di situs ini. Masuk dengan email.",
@@ -19,8 +20,11 @@ function safeNext(raw: string | null): string {
   return raw && raw.startsWith("/") && !raw.startsWith("//") && !raw.includes("\\") && raw.length <= 300 ? raw : "/akun";
 }
 
+/** Akun tanpa username (wajib) harus mengisinya dulu di /akun; tujuan semula dibawa serta. */
+const usernameGate = (next: string) => (next === "/akun" ? "/akun" : `/akun?next=${encodeURIComponent(next)}`);
+
 type Fail = { field: "email" | "code" | null; message: string };
-type ApiBody = { status?: boolean; error?: string; field?: string; wait?: number; retry_after?: number; resend?: boolean; user?: AuthUser; apiKey?: string };
+type ApiBody = SessionBody & { status?: boolean; error?: string; field?: string; wait?: number; retry_after?: number; resend?: boolean };
 
 async function post(action: string, body: unknown): Promise<{ ok: boolean; body: ApiBody }> {
   try {
@@ -36,12 +40,21 @@ function Spinner() {
   return <span className="spin h-4 w-4 rounded-full border-2 border-onaccent/30 border-t-onaccent" aria-hidden />;
 }
 
-export function LoginForm({ google, email: emailOn }: { google: boolean; email: boolean }) {
+/**
+ * Formulir masuk (/login) dan daftar (/daftar). Keduanya memakai kode email atau Google; bedanya,
+ * halaman daftar meminta username lebih dulu. Email yang belum terdaftar tetap bisa masuk lewat
+ * /login: akunnya dibuat, lalu username diminta di /akun sebelum akun bisa dipakai.
+ */
+export function LoginForm({ mode = "login", google, email: emailOn }: { mode?: "login" | "register"; google: boolean; email: boolean }) {
   const router = useRouter();
   const sp = useSearchParams();
   const next = safeNext(sp.get("next"));
   const queryError = QUERY_ERRORS[sp.get("error") ?? ""] ?? null;
   const auth = useAuth(google || emailOn);
+  const register = mode === "register";
+  const uname = useUsername();
+  const usernameRef = useRef<HTMLInputElement>(null);
+  const nextQuery = next === "/akun" ? "" : `?next=${encodeURIComponent(next)}`;
 
   const [step, setStep] = useState<"email" | "code">("email");
   const [email, setEmail] = useState("");
@@ -59,8 +72,8 @@ export function LoginForm({ google, email: emailOn }: { google: boolean; email: 
 
   // Sudah masuk (mis. membuka /login lagi): langsung ke tujuan.
   useEffect(() => {
-    if (auth.user) router.replace(next);
-  }, [auth.user, next, router]);
+    if (auth.user) router.replace(auth.needsUsername ? usernameGate(next) : next);
+  }, [auth.user, auth.needsUsername, next, router]);
 
   useEffect(() => {
     if (step !== "code") return;
@@ -82,6 +95,11 @@ export function LoginForm({ google, email: emailOn }: { google: boolean; email: 
 
   async function sendCode(kind: "send" | "resend") {
     if (busy) return;
+    if (register && (!uname.valid || uname.error)) {
+      uname.touch();
+      usernameRef.current?.focus();
+      return;
+    }
     if (!emailValid) {
       setEmailTouched(true);
       setFail({ field: "email", message: email.trim() ? "Alamat email belum lengkap. Contoh: nama@gmail.com." : "Isi alamat email dulu." });
@@ -91,7 +109,7 @@ export function LoginForm({ google, email: emailOn }: { google: boolean; email: 
     setBusy(kind);
     setFail(null);
     setNotice(null);
-    const { ok, body } = await post("otp", { email: email.trim() });
+    const { ok, body } = await post("otp", register ? { email: email.trim(), username: uname.name } : { email: email.trim() });
     setBusy(null);
     if (ok) {
       setCode("");
@@ -101,6 +119,13 @@ export function LoginForm({ google, email: emailOn }: { google: boolean; email: 
         setNotice("Kode baru sudah dikirim. Kode sebelumnya tidak berlaku lagi.");
         codeRef.current?.focus();
       }
+      return;
+    }
+    // Username ditolak server (mis. baru saja diambil orang lain): kembali ke kolomnya.
+    if (body.field === "username") {
+      uname.reject(body.error ?? "Username ini tidak bisa dipakai. Pilih yang lain.");
+      setStep("email");
+      setTimeout(() => usernameRef.current?.focus(), 0);
       return;
     }
     // Kode masih baru dikirim: lanjut ke langkah berikutnya supaya kode itu bisa dipakai.
@@ -126,11 +151,11 @@ export function LoginForm({ google, email: emailOn }: { google: boolean; email: 
     setBusy("verify");
     setFail(null);
     setNotice(null);
-    const { ok, body } = await post("verify", { email: email.trim(), code: value });
+    const { ok, body } = await post("verify", register ? { email: email.trim(), code: value, username: uname.name } : { email: email.trim(), code: value });
     verifying.current = false;
-    if (ok && body.user && body.apiKey) {
-      setSession(body.user, body.apiKey);
-      router.replace(next);
+    if (ok && body.user) {
+      setSession({ ...body, user: body.user });
+      router.replace(body.needsUsername ? usernameGate(next) : next);
       return;
     }
     setBusy(null);
@@ -221,7 +246,7 @@ export function LoginForm({ google, email: emailOn }: { google: boolean; email: 
 
           <button type="submit" disabled={busy !== null} className="btn btn-primary mt-4 w-full">
             {busy === "verify" ? <Spinner /> : null}
-            {busy === "verify" ? "Memeriksa" : "Verifikasi dan masuk"}
+            {busy === "verify" ? "Memeriksa" : register ? "Verifikasi dan daftar" : "Verifikasi dan masuk"}
           </button>
         </form>
 
@@ -236,12 +261,12 @@ export function LoginForm({ google, email: emailOn }: { google: boolean; email: 
               setFail(null);
               setNotice(null);
               setCode("");
-              setTimeout(() => emailRef.current?.focus(), 0);
+              setTimeout(() => (register ? usernameRef : emailRef).current?.focus(), 0);
             }}
             disabled={busy !== null}
             className="btn btn-secondary flex-1"
           >
-            Ganti email
+            {register ? "Ubah data" : "Ganti email"}
           </button>
         </div>
       </div>
@@ -250,8 +275,10 @@ export function LoginForm({ google, email: emailOn }: { google: boolean; email: 
 
   return (
     <div className="border border-line bg-card p-5 sm:p-8">
-      <h1 className="font-mono text-2xl font-bold tracking-tight">Masuk atau daftar</h1>
-      <p className="mt-3 text-muted">Belum punya akun? Cukup masuk: akun dan API key dibuat otomatis saat pertama kali masuk.</p>
+      <h1 className="font-mono text-2xl font-bold tracking-tight">{register ? "Daftar" : "Masuk"}</h1>
+      <p className="mt-3 text-muted">
+        {register ? "Buat akun gratis untuk mendapat API key. Cukup username dan email, tanpa kata sandi." : "Masuk untuk melihat dan mengelola API key kamu."}
+      </p>
 
       {queryError && (
         <p role="alert" className="mt-5 border border-danger p-3 text-sm font-medium text-danger">
@@ -262,20 +289,26 @@ export function LoginForm({ google, email: emailOn }: { google: boolean; email: 
       {google && (
         <a href={`/auth/google?next=${encodeURIComponent(next)}`} className={`btn mt-6 w-full ${emailOn ? "btn-secondary" : "btn-primary"}`}>
           <GoogleIcon className={emailOn ? "" : "bg-white p-0.5"} />
-          Lanjutkan dengan Google
+          {register ? "Daftar dengan Google" : "Lanjutkan dengan Google"}
         </a>
       )}
+      {google && register && <p className="mt-2 text-sm text-muted">Username dipilih setelah akun Google terhubung.</p>}
 
       {google && emailOn && (
         <div className="my-6 flex items-center gap-3 text-sm text-muted" role="separator">
           <span className="h-px flex-1 bg-line" aria-hidden />
-          atau pakai email
+          {register ? "atau daftar dengan email" : "atau pakai email"}
           <span className="h-px flex-1 bg-line" aria-hidden />
         </div>
       )}
 
       {emailOn && (
         <form onSubmit={onEmailSubmit} noValidate className={google ? "" : "mt-6"}>
+          {register && (
+            <div className="mb-4">
+              <UsernameField id="login-username" state={uname} inputRef={usernameRef} disabled={busy !== null} />
+            </div>
+          )}
           <label htmlFor="login-email" className="block text-sm font-semibold">
             Email <span className="font-normal text-muted">(wajib)</span>
           </label>
@@ -304,7 +337,7 @@ export function LoginForm({ google, email: emailOn }: { google: boolean; email: 
               tidak bergeser saat pesan muncul (pergeseran di tengah klik membuat klik itu hilang). */}
           <div className="mt-1 grid text-sm">
             <p id="login-email-help" className={`col-start-1 row-start-1 text-muted ${emailError ? "invisible" : ""}`}>
-              Kami kirim kode 6 angka ke alamat ini untuk memastikan email itu milikmu. Tidak perlu kata sandi.
+              Kami kirim kode 6 angka ke alamat ini untuk memastikan email itu milikmu.{register ? "" : " Tidak perlu kata sandi."}
             </p>
             {emailError && (
               <p id="login-email-error" role="alert" className="col-start-1 row-start-1 font-medium text-danger">
@@ -320,8 +353,15 @@ export function LoginForm({ google, email: emailOn }: { google: boolean; email: 
         </form>
       )}
 
-      <p className="mt-6 border-t border-line pt-5 text-sm text-muted">
-        Dengan masuk, kamu setuju memakai API ini secara wajar: tidak untuk spam atau hal yang melanggar hukum.
+      <p className="mt-4 flex flex-wrap items-center gap-x-1.5 text-[0.9375rem] text-muted">
+        {register ? "Sudah punya akun?" : "Belum punya akun?"}
+        <Link href={`${register ? "/login" : "/daftar"}${nextQuery}`} className="link inline-flex min-h-11 items-center font-semibold text-fg">
+          {register ? "Masuk" : "Daftar"}
+        </Link>
+      </p>
+
+      <p className="mt-2 border-t border-line pt-5 text-sm text-muted">
+        Dengan {register ? "mendaftar" : "masuk"}, kamu setuju memakai API ini secara wajar: tidak untuk spam atau hal yang melanggar hukum.
       </p>
     </div>
   );

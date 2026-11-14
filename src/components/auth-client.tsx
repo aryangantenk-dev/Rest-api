@@ -7,14 +7,28 @@ import { useSyncExternalStore } from "react";
   dan konsol di beranda. Dimuat sekali dari /api/auth/me saat komponen pertama memakainya.
 */
 
-export type AuthUser = { email: string; name: string; avatar: string; provider: "google" | "email"; created_at: string };
+export type AuthUser = {
+  email: string;
+  name: string;
+  /** Kosong selama belum dipilih. */
+  username: string;
+  /** Alamat foto profil di situs ini, atau kosong bila memakai gambar pengganti. */
+  photo: string;
+  provider: "google" | "email";
+  created_at: string;
+};
+
+/** Bagian jawaban server yang menggambarkan sesi (dari /api/auth/me, verify, username, photo, regenerate). */
+export type SessionBody = { user?: AuthUser | null; apiKey?: string | null; needsUsername?: boolean };
 
 export type AuthState = {
   /** "loading" sampai jawaban /api/auth/me tiba; "error" bila server akun tidak bisa dihubungi. */
   status: "loading" | "ready" | "error";
   user: AuthUser | null;
-  /** API key milik akun yang sedang masuk. */
+  /** API key milik akun yang sedang masuk. null selama akun belum punya username. */
   apiKey: string | null;
+  /** Sudah masuk tetapi username (wajib) belum diisi; halaman Akun memintanya dulu. */
+  needsUsername: boolean;
   /** API key yang ditempel sendiri oleh pengunjung yang belum masuk. */
   manualKey: string;
   methods: { google: boolean; email: boolean };
@@ -26,7 +40,7 @@ const SIGNED_HINT = "yn_signed_in";
 /** Teks pengganti di contoh URL dan kode selama API key belum diisi. */
 export const KEY_PLACEHOLDER = "API_KEY_KAMU";
 
-const initial: AuthState = { status: "loading", user: null, apiKey: null, manualKey: "", methods: { google: false, email: false }, keyRequired: false };
+const initial: AuthState = { status: "loading", user: null, apiKey: null, needsUsername: false, manualKey: "", methods: { google: false, email: false }, keyRequired: false };
 
 /**
  * Catat apakah browser ini sedang masuk. Dipakai skrip di <head> pada pemuatan berikutnya dan
@@ -60,7 +74,7 @@ function readManual(): string {
   }
 }
 
-type MeBody = { user?: AuthUser | null; apiKey?: string | null; methods?: AuthState["methods"]; keyRequired?: boolean };
+type MeBody = SessionBody & { methods?: AuthState["methods"]; keyRequired?: boolean };
 
 /** Muat ulang keadaan login dari server. */
 export async function refreshAuth(): Promise<void> {
@@ -73,6 +87,7 @@ export async function refreshAuth(): Promise<void> {
       status: r.ok ? "ready" : "error",
       user: body.user ?? null,
       apiKey: body.apiKey ?? null,
+      needsUsername: !!body.user && !!body.needsUsername,
       methods: body.methods ?? state.methods,
       keyRequired: body.keyRequired ?? state.keyRequired,
       manualKey: readManual(),
@@ -112,11 +127,11 @@ export function useApiKey(required: boolean): { key: string; shown: string; auth
   return { key, shown: required ? key || KEY_PLACEHOLDER : "", auth };
 }
 
-/** Dipanggil setelah login berhasil atau API key diganti. */
-export function setSession(user: AuthUser, apiKey: string) {
+/** Dipanggil dengan jawaban server setelah login berhasil atau setelah akun diubah (username, foto, API key). */
+export function setSession(body: SessionBody & { user: AuthUser }) {
   started = true;
   writeHint(true);
-  set({ status: "ready", user, apiKey });
+  set({ status: "ready", user: body.user, apiKey: body.apiKey ?? null, needsUsername: !!body.needsUsername });
 }
 
 /** Keluar: hapus sesi di server lalu lupakan semuanya di browser ini. */
@@ -129,7 +144,7 @@ export async function signOut(): Promise<boolean> {
   }
   setManualKey("");
   writeHint(false);
-  set({ user: null, apiKey: null });
+  set({ user: null, apiKey: null, needsUsername: false });
   return true;
 }
 

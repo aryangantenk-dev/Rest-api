@@ -2,12 +2,269 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import { refreshAuth, setSession, signOut, useAuth, type AuthUser } from "./auth-client";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { refreshAuth, setSession, signOut, useAuth, type AuthUser, type SessionBody } from "./auth-client";
+import { Avatar } from "./avatar";
 import { CopyButton, useOrigin } from "./client-utils";
-import { ArrowIcon, EyeIcon, EyeOffIcon, LogoutIcon, RefreshIcon } from "./icons";
+import { ArrowIcon, CameraIcon, EyeIcon, EyeOffIcon, LogoutIcon, RefreshIcon, TrashIcon } from "./icons";
+import { UsernameField, useUsername } from "./username-field";
 
 const mask = (key: string) => `${key.slice(0, 3)}${"•".repeat(12)}${key.slice(-4)}`;
+
+type Message = { ok: boolean; text: string };
+type Reply = SessionBody & { error?: string; field?: string };
+
+const OFFLINE = "Tidak dapat terhubung ke server. Periksa koneksimu, lalu coba lagi.";
+
+/** Kirim perubahan akun. Bila berhasil, keadaan login di browser langsung diperbarui. */
+async function send(action: string, init: RequestInit): Promise<{ ok: boolean; status: number; body: Reply }> {
+  try {
+    const r = await fetch(`/api/auth/${action}`, { method: "POST", credentials: "same-origin", ...init });
+    const body = (await r.json().catch(() => ({}))) as Reply;
+    if (r.ok && body.user) setSession({ ...body, user: body.user });
+    else if (r.status === 401) void refreshAuth();
+    return { ok: r.ok && !!body.user, status: r.status, body };
+  } catch {
+    return { ok: false, status: 0, body: { error: OFFLINE } };
+  }
+}
+
+const sendJson = (action: string, data: unknown) => send(action, { headers: { "content-type": "application/json" }, body: JSON.stringify(data) });
+
+/** Tujuan setelah username diisi (dibawa dari halaman login): hanya path di situs ini. */
+function nextFromQuery(): string | null {
+  const raw = new URLSearchParams(window.location.search).get("next");
+  return raw && raw.startsWith("/") && !raw.startsWith("//") && !raw.includes("\\") && raw.length <= 300 && raw !== "/akun" ? raw : null;
+}
+
+/** Langkah wajib bagi akun yang belum punya username; isi halaman Akun baru tampil setelahnya. */
+function UsernameStep({ user }: { user: AuthUser }) {
+  const router = useRouter();
+  const uname = useUsername();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState<"save" | "logout" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  async function onSubmit(ev: FormEvent) {
+    ev.preventDefault();
+    if (busy) return;
+    if (!uname.valid || uname.error) {
+      uname.touch();
+      inputRef.current?.focus();
+      return;
+    }
+    setBusy("save");
+    setError(null);
+    const { ok, body } = await sendJson("username", { username: uname.name });
+    if (ok) {
+      const next = nextFromQuery();
+      if (next) router.replace(next);
+      return;
+    }
+    setBusy(null);
+    if (body.field === "username") uname.reject(body.error ?? "Username ini tidak bisa dipakai. Pilih yang lain.");
+    else setError(body.error ?? "Username belum tersimpan. Coba lagi.");
+    inputRef.current?.focus();
+  }
+
+  async function logout() {
+    setBusy("logout");
+    setError(null);
+    if (await signOut()) router.replace("/login");
+    else {
+      setBusy(null);
+      setError("Belum berhasil keluar karena server tidak dapat dihubungi. Coba lagi.");
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-md border border-line bg-card p-5 sm:p-8">
+      <p className="font-mono text-sm text-muted">Satu langkah lagi</p>
+      <h1 className="mt-2 font-mono text-2xl font-bold tracking-tight">Pilih username</h1>
+      <p className="mt-3 text-muted">
+        Kamu masuk sebagai <strong className="wrap-anywhere font-semibold text-fg">{user.email}</strong>. Username wajib diisi sebelum API key bisa dipakai, dan bisa diganti kapan saja di halaman Akun.
+      </p>
+
+      <form onSubmit={onSubmit} noValidate className="mt-6">
+        <UsernameField id="akun-username-baru" state={uname} inputRef={inputRef} disabled={busy !== null} />
+        {error && (
+          <p role="alert" className="mt-3 border border-danger p-3 text-sm font-medium text-danger">
+            {error}
+          </p>
+        )}
+        <button type="submit" disabled={busy !== null} className="btn btn-primary mt-4 w-full">
+          {busy === "save" ? <span className="spin h-4 w-4 rounded-full border-2 border-onaccent/30 border-t-onaccent" aria-hidden /> : null}
+          {busy === "save" ? "Menyimpan" : "Simpan dan lanjutkan"}
+          {busy === "save" ? null : <ArrowIcon />}
+        </button>
+      </form>
+
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-line pt-5 text-sm text-muted">
+        <span>Bukan akunmu?</span>
+        <button type="button" onClick={() => void logout()} disabled={busy !== null} className="btn btn-secondary">
+          <LogoutIcon />
+          {busy === "logout" ? "Keluar…" : "Keluar"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const PHOTO_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const PHOTO_MAX_BYTES = 10 * 1024 * 1024;
+const PHOTO_SIDE = 256;
+
+/** Potong tengah gambar menjadi persegi, kecilkan ke 256 px, dan ubah ke JPG supaya unggahannya kecil. */
+function squareJpeg(file: File): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("decode"));
+    };
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const w = img.naturalWidth;
+      const h = img.naturalHeight;
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = PHOTO_SIDE;
+      const ctx = canvas.getContext("2d");
+      if (!ctx || !w || !h) return reject(new Error("decode"));
+      const side = Math.min(w, h);
+      // Latar putih untuk gambar tembus pandang (JPG tidak punya transparansi).
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, PHOTO_SIDE, PHOTO_SIDE);
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(img, (w - side) / 2, (h - side) / 2, side, side, 0, 0, PHOTO_SIDE, PHOTO_SIDE);
+      canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("encode"))), "image/jpeg", 0.86);
+    };
+    img.src = url;
+  });
+}
+
+function PhotoEditor({ user }: { user: AuthUser }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const pickRef = useRef<HTMLButtonElement>(null);
+  const [busy, setBusy] = useState<"upload" | "remove" | null>(null);
+  const [message, setMessage] = useState<Message | null>(null);
+
+  async function onPick(ev: ChangeEvent<HTMLInputElement>) {
+    const file = ev.target.files?.[0];
+    // Kosongkan supaya memilih berkas yang sama lagi tetap memicu onChange.
+    ev.target.value = "";
+    if (!file || busy) return;
+    if (!PHOTO_TYPES.includes(file.type)) return setMessage({ ok: false, text: "Berkas ini bukan gambar PNG, JPG, atau WebP. Pilih berkas lain." });
+    if (file.size > PHOTO_MAX_BYTES) return setMessage({ ok: false, text: "Ukuran berkas lebih dari 10 MB. Pilih gambar yang lebih kecil." });
+    setBusy("upload");
+    setMessage(null);
+    let blob: Blob;
+    try {
+      blob = await squareJpeg(file);
+    } catch {
+      setBusy(null);
+      return setMessage({ ok: false, text: "Gambar ini tidak bisa dibaca browser. Coba berkas PNG atau JPG lain." });
+    }
+    const { ok, body } = await send("photo", { headers: { "content-type": "image/jpeg" }, body: blob });
+    setBusy(null);
+    setMessage(ok ? { ok: true, text: "Foto profil diperbarui." } : { ok: false, text: body.error ?? "Foto belum tersimpan. Coba lagi." });
+  }
+
+  async function remove() {
+    if (busy) return;
+    setBusy("remove");
+    setMessage(null);
+    const { ok, body } = await send("unphoto", {});
+    setBusy(null);
+    setMessage(ok ? { ok: true, text: "Foto profil dihapus. Gambar pengganti dipakai lagi." } : { ok: false, text: body.error ?? "Foto belum terhapus. Coba lagi." });
+    // Tombol "Hapus foto" hilang setelah berhasil; pindahkan fokus ke tombol di sebelahnya.
+    if (ok) pickRef.current?.focus();
+  }
+
+  return (
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+      <div className="relative h-24 w-24 shrink-0" aria-busy={busy !== null}>
+        <Avatar photo={user.photo} name={user.username} className="h-24 w-24 text-4xl" />
+        {busy && (
+          <span className="absolute inset-0 grid place-items-center bg-bg/70" aria-hidden>
+            <span className="spin h-6 w-6 rounded-full border-2 border-fg/30 border-t-fg" />
+          </span>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <h3 className="text-sm font-semibold">
+          Foto profil <span className="font-normal text-muted">(opsional)</span>
+        </h3>
+        <p id="akun-foto-help" className="mt-1 text-sm text-muted">
+          {user.photo ? "PNG, JPG, atau WebP, maksimal 10 MB. Foto dipotong menjadi persegi." : "Belum diatur, jadi dipakai gambar pengganti. Unggah PNG, JPG, atau WebP, maksimal 10 MB; foto dipotong menjadi persegi."}
+        </p>
+        <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+          <button ref={pickRef} type="button" onClick={() => inputRef.current?.click()} disabled={busy !== null} aria-describedby="akun-foto-help" className="btn btn-secondary">
+            <CameraIcon />
+            {busy === "upload" ? "Mengunggah…" : user.photo ? "Ganti foto" : "Unggah foto"}
+          </button>
+          {user.photo && (
+            <button type="button" onClick={() => void remove()} disabled={busy !== null} className="btn btn-secondary">
+              <TrashIcon />
+              {busy === "remove" ? "Menghapus…" : "Hapus foto"}
+            </button>
+          )}
+        </div>
+        <input ref={inputRef} id="akun-foto" type="file" accept={PHOTO_TYPES.join(",")} onChange={(ev) => void onPick(ev)} className="hidden" tabIndex={-1} aria-label="Pilih berkas foto profil" />
+        <p role="status" className={`mt-2 min-h-5 text-sm font-medium ${message?.ok === false ? "text-danger" : "text-ok"}`}>
+          {message?.text}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function UsernameEditor({ user }: { user: AuthUser }) {
+  const uname = useUsername(user.username);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<Message | null>(null);
+
+  async function onSubmit(ev: FormEvent) {
+    ev.preventDefault();
+    if (busy || uname.unchanged) return;
+    if (!uname.valid || uname.error) {
+      uname.touch();
+      inputRef.current?.focus();
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    const { ok, body } = await sendJson("username", { username: uname.name });
+    setBusy(false);
+    if (ok) return setMessage({ ok: true, text: `Username diganti menjadi @${body.user?.username}.` });
+    if (body.field === "username") {
+      uname.reject(body.error ?? "Username ini tidak bisa dipakai. Pilih yang lain.");
+      inputRef.current?.focus();
+    } else setMessage({ ok: false, text: body.error ?? "Username belum tersimpan. Coba lagi." });
+  }
+
+  return (
+    <form onSubmit={onSubmit} noValidate>
+      <div className="flex flex-col gap-x-3 gap-y-2 sm:flex-row sm:items-start">
+        <div className="min-w-0 flex-1">
+          <UsernameField id="akun-username" state={uname} inputRef={inputRef} disabled={busy} />
+        </div>
+        {/* sm:mt-7 menyejajarkan tombol dengan kolom isian (melewati tinggi label). */}
+        <button type="submit" disabled={busy || uname.unchanged} className="btn btn-secondary shrink-0 sm:mt-7">
+          {busy ? "Menyimpan…" : "Simpan username"}
+        </button>
+      </div>
+      <p role="status" className={`mt-1 min-h-5 text-sm font-medium ${message?.ok === false ? "text-danger" : "text-ok"}`}>
+        {message?.text}
+      </p>
+    </form>
+  );
+}
 
 export function AccountPanel({ fallback }: { fallback: string }) {
   const router = useRouter();
@@ -16,7 +273,7 @@ export function AccountPanel({ fallback }: { fallback: string }) {
   const [shown, setShown] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState<"rotate" | "logout" | null>(null);
-  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [message, setMessage] = useState<Message | null>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
   const rotateRef = useRef<HTMLButtonElement>(null);
 
@@ -42,6 +299,8 @@ export function AccountPanel({ fallback }: { fallback: string }) {
       </div>
     );
   }
+
+  if (auth.user && auth.needsUsername) return <UsernameStep user={auth.user} />;
 
   if (!auth.user || !auth.apiKey) {
     return (
@@ -69,19 +328,12 @@ export function AccountPanel({ fallback }: { fallback: string }) {
   async function rotate() {
     setBusy("rotate");
     setMessage(null);
-    try {
-      const r = await fetch("/api/auth/regenerate", { method: "POST", credentials: "same-origin" });
-      const body = (await r.json().catch(() => ({}))) as { error?: string; user?: AuthUser; apiKey?: string };
-      if (r.ok && body.user && body.apiKey) {
-        setSession(body.user, body.apiKey);
-        setShown(true);
-        setMessage({ ok: true, text: "API key baru sudah aktif. Key lama berhenti berfungsi dalam satu menit; perbarui aplikasi yang masih memakainya." });
-      } else {
-        setMessage({ ok: false, text: body.error ?? "API key gagal diganti. Coba lagi." });
-        if (r.status === 401) void refreshAuth();
-      }
-    } catch {
-      setMessage({ ok: false, text: "Tidak dapat terhubung ke server. API key belum diganti; coba lagi." });
+    const { ok, status, body } = await send("regenerate", {});
+    if (ok) {
+      setShown(true);
+      setMessage({ ok: true, text: "API key baru sudah aktif. Key lama berhenti berfungsi dalam satu menit; perbarui aplikasi yang masih memakainya." });
+    } else {
+      setMessage({ ok: false, text: status === 0 ? "Tidak dapat terhubung ke server. API key belum diganti; coba lagi." : (body.error ?? "API key gagal diganti. Coba lagi.") });
     }
     setBusy(null);
     setConfirming(false);
@@ -101,11 +353,17 @@ export function AccountPanel({ fallback }: { fallback: string }) {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="font-mono text-[2rem] font-bold leading-tight tracking-tight">Akun</h1>
-        <p className="wrap-anywhere mt-2 text-muted">
-          Masuk sebagai <strong className="font-semibold text-fg">{user.email}</strong>
-        </p>
+      <header className="flex items-center gap-4">
+        <Avatar photo={user.photo} name={user.username} className="h-16 w-16 text-2xl" />
+        <div className="min-w-0">
+          <h1 className="font-mono text-[2rem] font-bold leading-tight tracking-tight">Akun</h1>
+          <p className="wrap-anywhere mt-1 text-muted">
+            <strong className="font-mono font-semibold text-fg">@{user.username}</strong>
+            <span aria-hidden> · </span>
+            <span className="sr-only">, </span>
+            {user.email}
+          </p>
+        </div>
       </header>
 
       <section aria-labelledby="akun-key" className="border border-control bg-card p-4 sm:p-6">
@@ -155,7 +413,13 @@ export function AccountPanel({ fallback }: { fallback: string }) {
         <h2 id="akun-profil" className="font-mono text-lg font-bold">
           Profil
         </h2>
-        <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+        <div className="mt-4">
+          <PhotoEditor user={user} />
+        </div>
+        <div className="mt-4 border-t border-line pt-5">
+          <UsernameEditor user={user} />
+        </div>
+        <dl className="mt-4 grid grid-cols-1 gap-x-6 gap-y-3 border-t border-line pt-5 sm:grid-cols-2">
           {user.name && (
             <div>
               <dt className="text-sm text-muted">Nama</dt>

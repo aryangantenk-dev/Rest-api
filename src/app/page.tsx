@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 
 const steps = [
   KEY_REQUIRED
-    ? { t: "Masuk dan ambil API key", d: "Masuk dengan Google atau email. API key gratis langsung dibuat dan tampil di halaman Akun." }
+    ? { t: "Daftar dan ambil API key", d: "Daftar dengan Google atau email dan pilih username. API key gratis langsung dibuat dan tampil di halaman Akun." }
     : { t: "Pilih endpoint", d: "Cari fitur yang kamu butuhkan di dokumentasi, lalu lihat parameter yang diperlukan." },
   KEY_REQUIRED
     ? { t: "Pilih endpoint, kirim GET", d: "Cari fitur di dokumentasi, lalu kirim GET ke base URL ditambah path, parameternya, dan apikey milikmu. Tidak perlu header khusus." }
@@ -44,7 +44,7 @@ const faqs = [
     q: KEY_REQUIRED ? `Apakah ${SITE_NAME} gratis, dan bagaimana cara mendapat API key?` : `Apakah ${SITE_NAME} benar-benar gratis dan tanpa API key?`,
     a: `${
       KEY_REQUIRED
-        ? "Gratis. Masuk dengan akun Google atau dengan email (kami kirim kode verifikasi), lalu API key berawalan yn- langsung dibuat untukmu. Sertakan key itu sebagai parameter apikey di setiap permintaan."
+        ? "Gratis. Daftar dengan akun Google atau dengan email (kami kirim kode verifikasi), pilih username, lalu API key berawalan yn- langsung dibuat untukmu. Sertakan key itu sebagai parameter apikey di setiap permintaan."
         : "Ya. Semua endpoint bisa dipanggil langsung tanpa registrasi maupun API key."
     } Untuk menjaga kualitas layanan, berlaku batas ${RATE_LIMIT} permintaan per menit untuk setiap alamat IP. IP yang berulang kali melewati batas akan diblokir dan bisa mengajukan banding ke owner lewat WhatsApp.`,
   },
@@ -130,8 +130,12 @@ export default function Home() {
               {KEY_REQUIRED && (
                 <p className="only-guest mt-3 text-sm text-muted">
                   Belum punya API key?{" "}
+                  <Link href="/daftar" className="link font-medium text-fg">
+                    Daftar gratis
+                  </Link>{" "}
+                  atau{" "}
                   <Link href="/login" className="link font-medium text-fg">
-                    Masuk dengan Google atau email
+                    masuk
                   </Link>
                   .
                 </p>

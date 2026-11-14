@@ -294,3 +294,18 @@ export function GoogleIcon({ className }: P) {
     </svg>
   );
 }
+export function CameraIcon({ className }: P) {
+  return (
+    <svg {...base} width={20} height={20} className={className}>
+      <path d="M4 8h3l1.5-2.5h7L17 8h3v11H4z" />
+      <circle cx="12" cy="13" r="3.5" />
+    </svg>
+  );
+}
+export function TrashIcon({ className }: P) {
+  return (
+    <svg {...base} width={20} height={20} className={className}>
+      <path d="M4 7h16M9 7V4h6v3M6.5 7l1 13h9l1-13M10 11v5M14 11v5" />
+    </svg>
+  );
+}

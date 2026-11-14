@@ -21,7 +21,11 @@ export function ApiKeyField() {
   const value = signedIn ? (auth.apiKey ?? "") : auth.manualKey;
   const invalid = !signedIn && touched && !!value && !/^yn-[0-9A-Za-z._-]{20,64}$/.test(value);
   const guestHelp = "Wajib untuk setiap permintaan. Masuk untuk mendapat API key gratis dan kolom ini terisi otomatis, atau tempel API key yang sudah kamu punya.";
-  const help = signedIn ? `Terisi otomatis dari akun ${auth.user?.email}. Dipakai untuk semua permintaan dan contoh kode di halaman ini.` : guestHelp;
+  const help = signedIn
+    ? `Terisi otomatis dari akun ${auth.user?.username ? `@${auth.user.username}` : auth.user?.email}. Dipakai untuk semua permintaan dan contoh kode di halaman ini.`
+    : auth.user && auth.needsUsername
+      ? "Akunmu belum punya username. Buka Kelola akun untuk mengisinya; setelah itu API key kamu tampil di sini."
+      : guestHelp;
 
   return (
     <section aria-labelledby="docs-apikey-label" className="border border-control bg-card p-4" aria-busy={loading}>

@@ -9,6 +9,10 @@ export type User = {
   email: string;
   name: string;
   avatar: string;
+  /** Kosong selama belum dipilih. Akun tanpa username belum bisa dipakai. */
+  username: string;
+  /** Nama berkas foto profil di penyimpanan; kosong berarti memakai gambar pengganti. */
+  photo: string;
   provider: "google" | "email";
   api_key: string;
   banned: boolean;
@@ -18,7 +22,15 @@ export type User = {
 
 /** Bentuk akun yang boleh dikirim ke browser pemiliknya. */
 export function publicUser(u: User) {
-  return { email: u.email, name: u.name, avatar: u.avatar, provider: u.provider, created_at: u.created_at };
+  return { email: u.email, name: u.name, username: u.username, photo: u.photo ? `/avatar/${u.photo}` : "", provider: u.provider, created_at: u.created_at };
+}
+
+/**
+ * Isi jawaban untuk browser pemilik akun. API key baru diberikan setelah username diisi:
+ * username wajib, jadi akun tanpa username diarahkan melengkapinya dulu.
+ */
+export function sessionBody(u: User) {
+  return { user: publicUser(u), apiKey: u.username ? u.api_key : null, needsUsername: !u.username };
 }
 
 export function normalizeEmail(raw: unknown): string | null {
@@ -44,6 +56,21 @@ export function rotateKey(id: string): Promise<User | null> {
   return supabaseRpc<User | null>("auth_rotate_key", { p_id: id, p_key: newApiKey() });
 }
 
+export function usernameTaken(username: string): Promise<boolean> {
+  return supabaseRpc<boolean>("auth_username_taken", { p_username: username });
+}
+
+export type SetUsername = { status: "ok"; user: User } | { status: "taken" | "invalid" | "none" };
+
+export function setUsername(id: string, username: string): Promise<SetUsername> {
+  return supabaseRpc<SetUsername>("auth_set_username", { p_id: id, p_username: username });
+}
+
+/** Simpan nama berkas foto profil ("" untuk menghapus). `old` adalah berkas sebelumnya. */
+export function setPhoto(id: string, photo: string): Promise<{ old: string; user: User } | null> {
+  return supabaseRpc<{ old: string; user: User } | null>("auth_set_photo", { p_id: id, p_photo: photo });
+}
+
 export type OtpIssue = { status: "sent" | "cooldown" | "limit" | "busy"; wait: number };
 
 export function otpIssue(email: string, hash: string, ip: string): Promise<OtpIssue> {
@@ -63,7 +90,7 @@ export async function otpCancel(email: string): Promise<void> {
   await supabaseRpc("auth_otp_cancel", { p_email: email });
 }
 
-export type AdminUsers = { total: number; users: { email: string; name: string; provider: string; banned: boolean; created_at: string; last_login_at: string; api_key: string }[] };
+export type AdminUsers = { total: number; users: { email: string; username: string; name: string; provider: string; banned: boolean; created_at: string; last_login_at: string; api_key: string }[] };
 
 export function adminUsers(limit: number): Promise<AdminUsers> {
   return supabaseRpc<AdminUsers>("auth_admin_users", { p_limit: limit });

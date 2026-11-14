@@ -27,6 +27,12 @@ export const IMAGE_TYPES = { png: "image/png", jpg: "image/jpeg", gif: "image/gi
 export type ImageExt = keyof typeof IMAGE_TYPES;
 export const IMAGE_NAME_RE = /^[0-9A-Za-z]{10}\.(png|jpg|gif|webp)$/;
 
+/** Foto profil disimpan di bucket yang sama, di dalam folder ini, dan tidak ikut dihapus otomatis. */
+export const AVATAR_DIR = "avatars/";
+export const AVATAR_NAME_RE = /^[0-9A-Za-z]{10}\.(png|jpg|webp)$/;
+/** Browser sudah mengecilkan foto menjadi 256 px sebelum mengunggah, jadi batas ini longgar. */
+export const MAX_AVATAR_BYTES = 512 * 1024;
+
 export type StoredImage = { name: string; size: number; created_at: string | null };
 
 export function hasImageStore(): boolean {
@@ -85,11 +91,14 @@ async function createBucket(): Promise<void> {
   throw new Error(`Gagal membuat bucket (${res.status}): ${text.slice(0, 200)}`);
 }
 
-/** Simpan gambar dan kembalikan nama berkasnya, mis. `aB3dE5fG7h.png`. Melempar Error bila penyimpanan gagal. */
-export async function saveImage(buf: Uint8Array, ext: ImageExt): Promise<string> {
+/**
+ * Simpan gambar dan kembalikan nama berkasnya, mis. `aB3dE5fG7h.png`. Melempar Error bila penyimpanan gagal.
+ * `dir` (mis. AVATAR_DIR) menaruhnya di dalam folder; nama yang dikembalikan tetap tanpa folder.
+ */
+export async function saveImage(buf: Uint8Array, ext: ImageExt, dir = ""): Promise<string> {
   const name = `${randomCode()}.${ext}`;
   const put = () =>
-    storage(`/object/${IMAGE_BUCKET}/${name}`, {
+    storage(`/object/${IMAGE_BUCKET}/${dir}${name}`, {
       method: "POST",
       headers: { "content-type": IMAGE_TYPES[ext], "cache-control": "max-age=31536000", "x-upsert": "false" },
       body: buf as BodyInit,

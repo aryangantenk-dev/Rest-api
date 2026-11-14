@@ -40,10 +40,13 @@ Tanpa database, semua endpoint lain tetap berjalan normal. Lihat `.env.example`.
 
 Login aktif bila tiga hal ini terpenuhi: Supabase terpasang (`supabase/schema.sql` sudah dijalankan), `AUTH_SECRET` terisi, dan minimal satu cara masuk dikonfigurasi (Google atau email). **Begitu login aktif, semua endpoint `/api/<kategori>/<nama>` menolak permintaan tanpa API key.** Selama belum lengkap, endpoint tetap terbuka dan tombol Masuk tidak ditampilkan.
 
-- **Masuk / daftar** di `/login`: dengan Google, atau dengan email yang dipastikan lewat kode 6 angka (berlaku 10 menit, sekali pakai, maksimal 5 kali salah). Akun dibuat otomatis saat pertama kali masuk. Akun dikenali dari alamat emailnya, jadi masuk lewat Google dan lewat email dengan alamat yang sama membuka akun yang sama.
+- **Daftar** di `/daftar`: isi username dan email, lalu masukkan kode 6 angka yang dikirim ke email itu (berlaku 10 menit, sekali pakai, maksimal 5 kali salah). Bisa juga dengan Google; username dipilih tepat setelah akun Google terhubung.
+- **Masuk** di `/login`: dengan Google atau dengan email dan kode 6 angka. Di bawah formulir ada tautan "Belum punya akun? Daftar". Akun dikenali dari alamat emailnya, jadi masuk lewat Google dan lewat email dengan alamat yang sama membuka akun yang sama.
+- **Username wajib**: 3–20 karakter, huruf kecil, angka, atau garis bawah, diawali huruf, dan tidak boleh sama dengan milik akun lain. Akun yang belum punya username (termasuk akun lama) diminta mengisinya begitu masuk; API key baru ditampilkan setelah itu. Key lama tetap berfungsi.
+- **Foto profil opsional**: PNG, JPG, atau WebP. Browser memotongnya menjadi persegi 256 px sebelum diunggah. Selama belum diatur, tampil gambar pengganti berisi huruf pertama username. Berkas disimpan di bucket gambar (folder `avatars/`) dan tidak ikut kedaluwarsa.
 - **API key** dibuat saat akun dibuat. Bentuknya `yn-` diikuti 32 karakter acak: huruf besar, huruf kecil, angka, dan tiga simbol `_`, `.`, `-`. Contoh: `yn-7Kq2fXz9_Lm4RtHv3.pNc6Wd1J-b5YeQa0`. Hanya tiga simbol itu yang dipakai karena aman ditulis apa adanya di URL.
 - **Mengirim API key**: parameter `?apikey=yn-...`, header `x-api-key: yn-...`, atau `Authorization: Bearer yn-...`.
-- **Halaman `/akun`**: lihat, salin, dan ganti API key; keluar.
+- **Halaman `/akun`**: lihat, salin, dan ganti API key; ganti username; unggah atau hapus foto profil; keluar.
 - **Dokumentasi**: kolom API key di `/docs` terisi otomatis selama pengguna masuk, dan ikut tertulis di URL serta contoh kode setiap endpoint.
 - Tautan di dalam respons yang menunjuk ke API ini sendiri (`cek`, `next`, proxy gambar komik, halaman player) otomatis membawa API key pemanggilnya.
 

@@ -125,6 +125,21 @@ create table if not exists public.auth_otps (
 
 create index if not exists auth_otps_last_sent_idx on public.auth_otps (last_sent_at);
 
+-- Username (wajib diisi sebelum akun dipakai; null selama belum dipilih) dan foto profil
+-- (opsional; nama berkas di folder avatars/ pada bucket gambar, kosong berarti belum diatur).
+alter table public.api_users add column if not exists username text;
+alter table public.api_users add column if not exists photo text not null default '';
+create unique index if not exists api_users_username_key on public.api_users (username);
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'api_users_username_format') then
+    alter table public.api_users add constraint api_users_username_format
+      check (username is null or username ~ '^[a-z][a-z0-9_]{2,19}$');
+  end if;
+end
+$$;
+
 alter table public.api_users enable row level security;
 alter table public.auth_otps enable row level security;
 revoke all on table public.api_users from anon, authenticated;
@@ -140,6 +155,7 @@ set search_path = ''
 as $$
   select json_build_object(
     'id', u.id, 'email', u.email, 'name', u.name, 'avatar', u.avatar, 'provider', u.provider,
+    'username', coalesce(u.username, ''), 'photo', u.photo,
     'api_key', u.api_key, 'banned', u.banned, 'created_at', u.created_at, 'last_login_at', u.last_login_at
   );
 $$;
@@ -312,12 +328,63 @@ as $$
     'total', (select count(*) from public.api_users),
     'users', (
       select coalesce(json_agg(t), '[]'::json) from (
-        select email, name, provider, banned, created_at, last_login_at,
+        select email, coalesce(username, '') as username, name, provider, banned, created_at, last_login_at,
                left(api_key, 7) || '…' || right(api_key, 4) as api_key
         from public.api_users order by created_at desc limit greatest(1, least(p_limit, 500))
       ) t
     )
   );
+$$;
+
+-- true bila username sudah dipakai akun lain.
+create or replace function public.auth_username_taken(p_username text)
+returns boolean
+language sql
+stable
+set search_path = ''
+as $$
+  select exists (select 1 from public.api_users where username = p_username);
+$$;
+
+-- Isi atau ganti username. status: 'ok' (beserta akun), 'taken', 'invalid', atau 'none' (akun tidak ada).
+create or replace function public.auth_set_username(p_id uuid, p_username text)
+returns json
+language plpgsql
+set search_path = ''
+as $$
+declare
+  u public.api_users;
+begin
+  update public.api_users set username = p_username where id = p_id returning * into u;
+  if not found then
+    return json_build_object('status', 'none');
+  end if;
+  return json_build_object('status', 'ok', 'user', public.auth_user_json(u));
+exception
+  when unique_violation then
+    return json_build_object('status', 'taken');
+  when check_violation then
+    return json_build_object('status', 'invalid');
+end;
+$$;
+
+-- Atur foto profil (p_photo kosong = hapus). Mengembalikan nama berkas lama supaya bisa dihapus dari penyimpanan.
+create or replace function public.auth_set_photo(p_id uuid, p_photo text)
+returns json
+language plpgsql
+set search_path = ''
+as $$
+declare
+  u public.api_users;
+  old text;
+begin
+  select photo into old from public.api_users where id = p_id for update;
+  if not found then
+    return null;
+  end if;
+  update public.api_users set photo = p_photo where id = p_id returning * into u;
+  return json_build_object('old', old, 'user', public.auth_user_json(u));
+end;
 $$;
 
 -- Nonaktifkan / aktifkan lagi sebuah akun (API key-nya ikut berhenti / jalan lagi).
@@ -342,6 +409,9 @@ revoke all on function public.auth_otp_check(text, text, integer) from public, a
 revoke all on function public.auth_otp_cancel(text) from public, anon, authenticated;
 revoke all on function public.auth_admin_users(integer) from public, anon, authenticated;
 revoke all on function public.auth_set_banned(text, boolean) from public, anon, authenticated;
+revoke all on function public.auth_username_taken(text) from public, anon, authenticated;
+revoke all on function public.auth_set_username(uuid, text) from public, anon, authenticated;
+revoke all on function public.auth_set_photo(uuid, text) from public, anon, authenticated;
 grant execute on function public.auth_user_json(public.api_users) to service_role;
 grant execute on function public.auth_login(text, text, text, text, text) to service_role;
 grant execute on function public.auth_user(uuid) to service_role;
@@ -352,3 +422,6 @@ grant execute on function public.auth_otp_check(text, text, integer) to service_
 grant execute on function public.auth_otp_cancel(text) to service_role;
 grant execute on function public.auth_admin_users(integer) to service_role;
 grant execute on function public.auth_set_banned(text, boolean) to service_role;
+grant execute on function public.auth_username_taken(text) to service_role;
+grant execute on function public.auth_set_username(uuid, text) to service_role;
+grant execute on function public.auth_set_photo(uuid, text) to service_role;
