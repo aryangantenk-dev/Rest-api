@@ -12,6 +12,7 @@ import { APPEAL_URL } from "@/lib/guard";
 import { colorizeJson } from "@/lib/highlight";
 import { RATE_LIMIT } from "@/lib/limits";
 import { KEY_REQUIRED } from "@/lib/auth/config";
+import { showcase, showcaseHost } from "@/lib/showcase";
 import { SITE_CREATOR, SITE_NAME, SITE_TAGLINE, SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -233,8 +234,93 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ───────── Contoh web ───────── */}
+      <section id="contoh" className="border-t border-line bg-card">
+        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-10 px-4 py-16 sm:px-6 lg:grid-cols-12 lg:gap-12 lg:py-24">
+          <div className="lg:col-span-5">
+            <h2 className="max-w-[24ch] font-mono text-2xl font-bold tracking-tight sm:text-[2rem]">{`Lihat contoh web yang memakai ${SITE_NAME}`}</h2>
+            <p className="mt-4 max-w-[55ch] text-muted">Situs sungguhan yang datanya diambil dari API ini. Buka untuk melihat hasil jadinya, lalu cek endpoint mana yang dipakai tiap fiturnya.</p>
+            <p className="mt-6 max-w-[55ch] text-sm text-muted">
+              {`Punya web atau bot yang memakai ${SITE_NAME}? `}
+              <a href={APPEAL_URL} target="_blank" rel="noopener" className="link font-medium text-fg">
+                Kabari owner lewat WhatsApp
+                <span className="sr-only"> (terbuka di tab baru)</span>
+              </a>{" "}
+              supaya ikut tampil di sini.
+            </p>
+          </div>
+
+          <ul className="min-w-0 space-y-4 lg:col-span-7">
+            {showcase.map((site) => {
+              const docs = categories.find((c) => c.id === site.category);
+              return (
+                <li key={site.url}>
+                  <article className="border border-line bg-bg">
+                    {/* Bilah alamat: menegaskan bahwa ini situs lain, bukan bagian dari yanz.api. */}
+                    <div className="flex min-h-11 items-center gap-3 border-b border-line px-4 font-mono text-sm text-muted">
+                      <span className="flex shrink-0 gap-1.5" aria-hidden>
+                        <span className="h-2 w-2 bg-control" />
+                        <span className="h-2 w-2 bg-control" />
+                        <span className="h-2 w-2 bg-ok" />
+                      </span>
+                      <span className="min-w-0 truncate">{showcaseHost(site.url)}</span>
+                    </div>
+
+                    <div className="p-4 sm:p-6">
+                      <p className="font-mono text-sm text-muted">{site.kind}</p>
+                      <h3 className="mt-1 font-mono text-xl font-bold sm:text-2xl">{site.name}</h3>
+                      <p className="mt-1 font-medium">{site.tagline}</p>
+                      <p className="mt-3 max-w-[60ch] text-muted">{site.description}</p>
+
+                      <h4 className="mt-6 text-sm font-semibold">Fitur dan endpoint yang dipakai</h4>
+                      <dl className="mt-2 border-t border-line">
+                        {site.uses.map((u) => (
+                          <div key={u.feature} className="flex flex-col border-b border-line py-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                            <dt className="pt-2 sm:pt-0">{u.feature}</dt>
+                            <dd className="flex flex-wrap gap-x-4 sm:justify-end">
+                              {u.endpoints.map((path) => {
+                                const [cat, slug] = path.split("/");
+                                // Hanya endpoint yang benar-benar terdaftar yang diberi tautan ke dokumentasinya.
+                                const known = meta.some((e) => e.category === cat && e.slug === slug);
+                                return known ? (
+                                  <Link key={path} href={`/docs/${cat}#${cat}-${slug}`} className="link inline-flex min-h-11 items-center font-mono text-sm text-fg">
+                                    /api/{path}
+                                  </Link>
+                                ) : (
+                                  <span key={path} className="inline-flex min-h-11 items-center font-mono text-sm text-muted">
+                                    /api/{path}
+                                  </span>
+                                );
+                              })}
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+
+                      <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+                        <a href={site.url} target="_blank" rel="noopener" className="btn btn-primary">
+                          {`Buka ${site.name}`}
+                          <ExternalIcon />
+                          <span className="sr-only">(terbuka di tab baru)</span>
+                        </a>
+                        {docs && (
+                          <Link href={`/docs/${docs.id}`} className="btn btn-secondary">
+                            {`Dokumentasi ${docs.name}`}
+                            <ArrowIcon />
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  </article>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </section>
+
       {/* ───────── Keunggulan ───────── */}
-      <section className="border-t border-line bg-card">
+      <section className="border-t border-line">
         <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-24">
           <h2 className="max-w-[24ch] font-mono text-2xl font-bold tracking-tight sm:text-[2rem]">Fokus membangun, bukan mengurus akses</h2>
           <ul className="mt-10 grid grid-cols-1 gap-x-12 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
@@ -249,7 +335,7 @@ export default function Home() {
       </section>
 
       {/* ───────── FAQ ───────── */}
-      <section id="faq" className="border-t border-line">
+      <section id="faq" className="border-t border-line bg-card">
         <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:py-24">
           <h2 className="font-mono text-2xl font-bold tracking-tight sm:text-[2rem]">Pertanyaan yang sering muncul</h2>
           <div className="mt-8 border-t border-line">
@@ -267,7 +353,7 @@ export default function Home() {
       </section>
 
       {/* ───────── Kontak ───────── */}
-      <section className="border-t border-line bg-card">
+      <section className="border-t border-line">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-16 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:py-20">
           <div>
             <h2 className="font-mono text-2xl font-bold tracking-tight sm:text-[2rem]">Belum ketemu jawabannya?</h2>

@@ -45,6 +45,7 @@ export function SiteFooter({ total }: { total: number }) {
               <a href="/api" className={linkClass}>Indeks endpoint (JSON)</a>
             </li>
             <li><Link href="/#mulai" className={linkClass}>Cara pakai</Link></li>
+            <li><Link href="/#contoh" className={linkClass}>Contoh web</Link></li>
             <li><Link href="/#faq" className={linkClass}>Pertanyaan umum</Link></li>
           </ul>
         </nav>

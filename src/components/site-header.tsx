@@ -11,6 +11,7 @@ const links = [
   { href: "/docs", label: "Dokumentasi" },
   { href: "/#kategori", label: "Kategori" },
   { href: "/#mulai", label: "Cara pakai" },
+  { href: "/#contoh", label: "Contoh" },
   { href: "/#faq", label: "FAQ" },
 ];
 
