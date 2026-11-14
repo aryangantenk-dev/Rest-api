@@ -2,6 +2,8 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { colorizeJson } from "@/lib/highlight";
+import Link from "next/link";
+import { useApiKey, withKey } from "./auth-client";
 import { CopyButton, LoadedImage, REDIRECT_FAILED, asksRedirect, loadImage, useOrigin } from "./client-utils";
 import { PlayIcon } from "./icons";
 
@@ -65,8 +67,23 @@ async function request(target: string, signal: AbortSignal): Promise<Result | nu
  * Konsol di beranda: cari endpoint, kirim permintaan sungguhan, dan baca responsnya.
  * Sebelum ada permintaan, yang tampil adalah contoh statis dan diberi label "contoh".
  */
-export function TryConsole({ endpoints, picks, fallback, sample }: { endpoints: ConsoleEndpoint[]; picks: ConsoleEndpoint[]; fallback: string; sample: string }) {
+export function TryConsole({
+  endpoints,
+  picks,
+  fallback,
+  sample,
+  keyRequired = false,
+}: {
+  endpoints: ConsoleEndpoint[];
+  picks: ConsoleEndpoint[];
+  fallback: string;
+  sample: string;
+  /** Endpoint menolak permintaan tanpa API key. */
+  keyRequired?: boolean;
+}) {
   const origin = useOrigin(fallback);
+  const { key: apiKey, shown: shownKey, auth } = useApiKey(keyRequired);
+  const needsLogin = keyRequired && auth.status !== "loading" && !apiKey;
   const uid = useId();
   const listId = `${uid}-list`;
   const inputRef = useRef<HTMLInputElement>(null);
@@ -97,17 +114,25 @@ export function TryConsole({ endpoints, picks, fallback, sample }: { endpoints: 
   const showList = listOpen && matches.length > 0;
 
   const clean = value.trim().replace(/^\/+/, "").replace(/^api\//, "");
-  const fullUrl = `${origin}/api/${clean}`;
+  const fullUrl = withKey(`${origin}/api/${clean}`, shownKey);
 
   async function send(pathOverride?: string) {
     const target = (pathOverride ?? clean).trim();
     if (!target) return;
+    if (keyRequired && !apiKey && !/[?&]apikey=/.test(target)) {
+      abortRef.current?.abort();
+      abortRef.current = null;
+      setListOpen(false);
+      setLoading(false);
+      setRes({ kind: "error", message: "Permintaan ini butuh API key. Masuk dulu untuk mendapat API key gratis; setelah itu konsol ini memakainya secara otomatis." });
+      return;
+    }
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     setListOpen(false);
     setLoading(true);
-    const next = await request(target, ctrl.signal);
+    const next = await request(withKey(target, apiKey), ctrl.signal);
     if (abortRef.current !== ctrl) {
       // Sudah digantikan permintaan yang lebih baru: buang hasil ini.
       if (next?.kind === "image" || next?.kind === "video") URL.revokeObjectURL(next.src);
@@ -249,6 +274,22 @@ export function TryConsole({ endpoints, picks, fallback, sample }: { endpoints: 
             </button>
           ))}
         </div>
+
+        {keyRequired && (
+          <p className="mt-3 min-h-6 text-sm text-muted">
+            {needsLogin ? (
+              <>
+                Butuh API key.{" "}
+                <Link href="/login?next=/" className="link font-medium text-fg">
+                  Masuk untuk mendapat API key gratis
+                </Link>
+                , lalu konsol ini langsung bisa dipakai.
+              </>
+            ) : apiKey ? (
+              "API key kamu disertakan otomatis di setiap permintaan dari konsol ini."
+            ) : null}
+          </p>
+        )}
       </form>
 
       <div className="bg-code text-codefg">

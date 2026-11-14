@@ -37,25 +37,30 @@ export type Ban = { ip: string; reason: string; created_at: string | null };
 const supabaseUrl = (process.env.SUPABASE_URL || "").trim().replace(/\/+$/, "");
 const supabaseKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || "").trim();
 
-function supabaseStore(): Store {
-  async function rpc<T>(fn: string, args: Record<string, unknown> = {}): Promise<T> {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 8000);
-    try {
-      const res = await fetch(`${supabaseUrl}/rest/v1/rpc/${fn}`, {
-        method: "POST",
-        headers: { apikey: supabaseKey, authorization: `Bearer ${supabaseKey}`, "content-type": "application/json" },
-        body: JSON.stringify(args),
-        cache: "no-store",
-        signal: ctrl.signal,
-      });
-      if (!res.ok) throw new Error(`Supabase ${fn} gagal (${res.status})`);
-      const body = await res.text();
-      return (body ? JSON.parse(body) : null) as T;
-    } finally {
-      clearTimeout(timer);
-    }
+export const hasSupabase = !!(supabaseUrl && supabaseKey);
+
+/** Panggil fungsi Postgres lewat REST Supabase memakai service role. Melempar Error bila gagal. */
+export async function supabaseRpc<T>(fn: string, args: Record<string, unknown> = {}): Promise<T> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const res = await fetch(`${supabaseUrl}/rest/v1/rpc/${fn}`, {
+      method: "POST",
+      headers: { apikey: supabaseKey, authorization: `Bearer ${supabaseKey}`, "content-type": "application/json" },
+      body: JSON.stringify(args),
+      cache: "no-store",
+      signal: ctrl.signal,
+    });
+    if (!res.ok) throw new Error(`Supabase ${fn} gagal (${res.status})`);
+    const body = await res.text();
+    return (body ? JSON.parse(body) : null) as T;
+  } finally {
+    clearTimeout(timer);
   }
+}
+
+function supabaseStore(): Store {
+  const rpc = supabaseRpc;
 
   async function table<T>(method: string, query: string, body?: unknown, prefer?: string): Promise<T> {
     const ctrl = new AbortController();
@@ -166,7 +171,7 @@ let store: Store | null | undefined;
 
 export function getStore(): Store | null {
   if (store === undefined) {
-    store = supabaseUrl && supabaseKey ? supabaseStore() : hasDatabase ? postgresStore() : null;
+    store = hasSupabase ? supabaseStore() : hasDatabase ? postgresStore() : null;
   }
   return store;
 }

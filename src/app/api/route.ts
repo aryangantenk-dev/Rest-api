@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { allMeta } from "@/lib/api/registry";
 import { categories } from "@/lib/api/categories";
+import { KEY_REQUIRED } from "@/lib/auth/config";
 import { SITE_CREATOR, SITE_NAME, getOrigin } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,10 @@ export async function GET(req: Request) {
         creator: SITE_CREATOR,
         baseUrl: `${origin}/api`,
         docs: `${origin}/docs`,
-        apiKey: "not required",
+        apiKey: KEY_REQUIRED ? "required" : "not required",
+        ...(KEY_REQUIRED
+          ? { auth: { login: `${origin}/login`, how: "Tambahkan parameter apikey=yn-... ke setiap permintaan, atau kirim header x-api-key." } }
+          : {}),
         totalEndpoints: list.length,
         categories: categories.map((c) => ({
           id: c.id,

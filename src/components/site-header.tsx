@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { CloseIcon, LogoMark, MenuIcon, MoonIcon, SunIcon } from "./icons";
+import { useAuth } from "./auth-client";
+import { CloseIcon, LogoMark, MenuIcon, MoonIcon, SunIcon, UserIcon } from "./icons";
 
 const links = [
   { href: "/docs", label: "Dokumentasi" },
@@ -37,8 +38,10 @@ function ThemeToggle() {
   );
 }
 
-export function SiteHeader() {
+export function SiteHeader({ authEnabled = false }: { authEnabled?: boolean }) {
   const pathname = usePathname();
+  // Memuat sesi sekali per halaman; hasilnya memperbarui atribut data-signed yang dipakai tombol akun.
+  useAuth(authEnabled);
   // Menu seluler terikat ke halaman tempat ia dibuka, jadi otomatis tertutup saat berpindah halaman.
   const [openAt, setOpenAt] = useState<string | null>(null);
   const open = openAt === pathname;
@@ -82,6 +85,27 @@ export function SiteHeader() {
 
         <div className="flex items-center gap-2">
           <ThemeToggle />
+          {/* Kedua tombol selalu ada; CSS menampilkan salah satunya menurut status login (lihat .only-signed),
+              sehingga pilihannya sudah benar sejak halaman pertama kali digambar. Lebarnya sama. */}
+          {authEnabled && (
+            <>
+              <Link
+                href="/login"
+                onClick={() => setOpen(false)}
+                aria-current={pathname === "/login" ? "page" : undefined}
+                // Di halaman login tombol utamanya ada di formulir, jadi tombol ini tidak ikut menonjol.
+                className={`only-guest btn relative min-w-[5.75rem] px-3 ${pathname === "/login" ? "btn-secondary" : "btn-primary"}`}
+              >
+                Masuk
+                {pathname === "/login" && <span className="absolute inset-x-0 -bottom-2 h-0.5 bg-fg" aria-hidden />}
+              </Link>
+              <Link href="/akun" onClick={() => setOpen(false)} aria-current={pathname === "/akun" ? "page" : undefined} className="only-signed btn btn-secondary relative min-w-[5.75rem] px-3">
+                <UserIcon />
+                Akun
+                {pathname === "/akun" && <span className="absolute inset-x-0 -bottom-2 h-0.5 bg-fg" aria-hidden />}
+              </Link>
+            </>
+          )}
           <button
             type="button"
             aria-label={open ? "Tutup menu" : "Buka menu"}

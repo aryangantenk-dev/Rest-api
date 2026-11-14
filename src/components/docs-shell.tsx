@@ -4,13 +4,15 @@ import { allMeta } from "@/lib/api/registry";
 import type { CategoryId } from "@/lib/api/types";
 import { SITE_NAME, SITE_URL } from "@/lib/site";
 import { RATE_LIMIT } from "@/lib/limits";
+import { KEY_REQUIRED } from "@/lib/auth/config";
+import { ApiKeyField } from "./api-key-field";
 import { CategoryMenu } from "./category-menu";
 import { BaseUrlBox } from "./client-utils";
 import { DocsExplorer } from "./docs-explorer";
 
 const facts = [
   ["Metode", "GET"],
-  ["Autentikasi", "Tidak ada"],
+  ["Autentikasi", KEY_REQUIRED ? "API key" : "Tidak ada"],
   ["Format", "JSON / PNG"],
   ["Batas", `${RATE_LIMIT} / menit / IP`],
 ] as const;
@@ -79,10 +81,15 @@ export function DocsShell({ active }: { active?: CategoryId }) {
                 </div>
               ))}
             </dl>
+            {KEY_REQUIRED && (
+              <div className="mt-6">
+                <ApiKeyField />
+              </div>
+            )}
           </header>
 
           <div className="mt-6">
-            <DocsExplorer endpoints={list} categories={cats} fallback={SITE_URL} showGroupHeadings={!active} />
+            <DocsExplorer endpoints={list} categories={cats} fallback={SITE_URL} showGroupHeadings={!active} keyRequired={KEY_REQUIRED} />
           </div>
         </div>
       </div>

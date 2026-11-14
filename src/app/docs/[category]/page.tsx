@@ -4,7 +4,7 @@ import { DocsShell } from "@/components/docs-shell";
 import { categories, categoryById } from "@/lib/api/categories";
 import { allMeta } from "@/lib/api/registry";
 import type { CategoryId } from "@/lib/api/types";
-import { SITE_NAME, SITE_URL } from "@/lib/site";
+import { SITE_NAME, SITE_URL, SITE_PITCH } from "@/lib/site";
 
 export const dynamicParams = false;
 
@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: { params: Promise<{ category:
   const count = allMeta().filter((e) => e.category === c.id).length;
   return {
     title: c.seoTitle,
-    description: `${c.description} ${count} endpoint, gratis tanpa API key, lengkap dengan playground dan contoh kode.`,
+    description: `${c.description} ${count} endpoint, ${SITE_PITCH}, lengkap dengan playground dan contoh kode.`,
     alternates: { canonical: `/docs/${c.id}` },
     openGraph: { url: `/docs/${c.id}`, title: `${c.seoTitle} | ${SITE_NAME}`, description: c.description },
   };

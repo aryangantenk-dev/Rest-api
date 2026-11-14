@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import type { EndpointMeta } from "@/lib/api/types";
 import type { Category } from "@/lib/api/categories";
 import { colorizeJson } from "@/lib/highlight";
+import { useApiKey, withKey } from "./auth-client";
 import { buildSnippets, buildUploadSnippets } from "./code-tabs";
 import { CopyButton, LoadedImage, REDIRECT_FAILED, asksRedirect, loadImage, useOrigin } from "./client-utils";
 import { CategoryIcon, ChevronIcon, PlayIcon, SearchIcon } from "./icons";
@@ -31,9 +32,11 @@ function scrollToEl(el: Element | null | undefined) {
   window.scrollTo({ top: Math.max(0, top), behavior: calm ? "auto" : "smooth" });
 }
 
-function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: string; forceOpen: boolean }) {
+function EndpointCard({ e, fallback, forceOpen, keyRequired }: { e: EndpointMeta; fallback: string; forceOpen: boolean; keyRequired: boolean }) {
   const id = `${e.category}-${e.slug}`;
   const origin = useOrigin(fallback);
+  // `apiKey` dikirim bersama permintaan; `shownKey` tampil di URL dan contoh kode (teks pengganti bila belum ada key).
+  const { key: apiKey, shown: shownKey } = useApiKey(keyRequired);
   const [open, setOpen] = useState(false);
   // Isi playground baru dipasang saat kartu pertama kali dibuka agar halaman dengan ratusan kartu tetap ringan.
   const [mounted, setMounted] = useState(false);
@@ -78,14 +81,19 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
     return s ? `?${s}` : "";
   }, [e.params, values]);
 
-  const fullUrl = `${origin}${e.path}${query}`;
+  const fullUrl = withKey(`${origin}${e.path}${query}`, shownKey);
   const missing = e.params.filter((p) => p.required && !values[p.name]?.trim());
 
   const send = useCallback(async () => {
     setLoading(true);
     setTab("respons");
     const t0 = performance.now();
-    const url = `${e.path}${query}`;
+    if (keyRequired && !apiKey) {
+      setRes({ ok: false, status: 0, ms: 0, type: "", error: "API key belum diisi. Masuk untuk mendapat API key gratis, atau tempel API key kamu di kolom API key di bagian atas halaman ini." });
+      setLoading(false);
+      return;
+    }
+    const url = withKey(`${e.path}${query}`, apiKey);
     const forget = () => {
       if (imgRef.current) {
         URL.revokeObjectURL(imgRef.current);
@@ -101,7 +109,7 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
         }
         const form = new FormData();
         form.append(e.upload.field, file);
-        const r = await fetch(e.path, { method: "POST", body: form });
+        const r = await fetch(withKey(e.path, apiKey), { method: "POST", body: form });
         const raw = await r.text();
         let text = raw;
         try {
@@ -150,7 +158,7 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
     } finally {
       setLoading(false);
     }
-  }, [e.path, e.title, e.upload, file, query]);
+  }, [apiKey, e.path, e.title, e.upload, file, keyRequired, query]);
 
   const onSubmit = (ev: FormEvent) => {
     ev.preventDefault();
@@ -167,8 +175,8 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
 
   // Endpoint unggahan: contoh POST ditampilkan bila berkas dipilih atau belum ada parameter yang diisi.
   const posting = !!e.upload && (!!file || !query);
-  const snippets = e.upload && posting ? buildUploadSnippets(`${origin}${e.path}`, e.upload.field) : buildSnippets(fullUrl);
-  const shownUrl = e.upload && file ? `${origin}${e.path}` : fullUrl;
+  const snippets = e.upload && posting ? buildUploadSnippets(withKey(`${origin}${e.path}`, shownKey), e.upload.field) : buildSnippets(fullUrl);
+  const shownUrl = e.upload && file ? withKey(`${origin}${e.path}`, shownKey) : fullUrl;
 
   return (
     <article ref={ref} id={id} className={`scroll-mt-36 border bg-card transition-colors duration-150 ${isOpen ? "border-control" : "border-line hover:border-control"}`}>
@@ -417,7 +425,20 @@ function EndpointCard({ e, fallback, forceOpen }: { e: EndpointMeta; fallback: s
   );
 }
 
-export function DocsExplorer({ endpoints, categories, fallback, showGroupHeadings = true }: { endpoints: EndpointMeta[]; categories: Category[]; fallback: string; showGroupHeadings?: boolean }) {
+export function DocsExplorer({
+  endpoints,
+  categories,
+  fallback,
+  showGroupHeadings = true,
+  keyRequired = false,
+}: {
+  endpoints: EndpointMeta[];
+  categories: Category[];
+  fallback: string;
+  showGroupHeadings?: boolean;
+  /** Endpoint menolak permintaan tanpa API key: sertakan key di setiap permintaan dan contoh. */
+  keyRequired?: boolean;
+}) {
   const [q, setQ] = useState("");
   const input = useRef<HTMLInputElement>(null);
 
@@ -531,7 +552,7 @@ export function DocsExplorer({ endpoints, categories, fallback, showGroupHeading
             const cards = (
               <div className="space-y-2">
                 {items.map((e) => (
-                  <EndpointCard key={e.path} e={e} fallback={fallback} forceOpen={!!term && filtered.length === 1} />
+                  <EndpointCard key={e.path} e={e} fallback={fallback} forceOpen={!!term && filtered.length === 1} keyRequired={keyRequired} />
                 ))}
               </div>
             );

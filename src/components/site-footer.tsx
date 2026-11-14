@@ -1,3 +1,4 @@
+import { SITE_PITCH } from "@/lib/site";
 import Link from "next/link";
 import { categories } from "@/lib/api/categories";
 import { RATE_LIMIT } from "@/lib/limits";
@@ -17,7 +18,7 @@ export function SiteFooter({ total }: { total: number }) {
             </span>
           </Link>
           <p className="mt-4 max-w-[45ch] text-sm text-muted">
-            {`REST API gratis tanpa API key untuk developer, pelajar, dan pembuat bot. ${total} endpoint, respons JSON konsisten, dan CORS terbuka.`}
+            {`REST API ${SITE_PITCH} untuk developer, pelajar, dan pembuat bot. ${total} endpoint, respons JSON konsisten, dan CORS terbuka.`}
           </p>
         </div>
 

@@ -4,6 +4,8 @@ import { HttpError } from "@/lib/api/types";
 import { SITE_CREATOR, getOrigin } from "@/lib/site";
 import { recordHit } from "@/lib/stats";
 import { APPEAL_URL, OWNER_WA, RATE_LIMIT, clientIp, guard } from "@/lib/guard";
+import { KEY_REQUIRED } from "@/lib/auth/config";
+import { keyFromRequest, verifyKey, withKeyInHtml, withKeyInLinks } from "@/lib/auth/apikey";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -66,16 +68,50 @@ async function handle(req: Request, ctx: RouteCtx) {
     );
   }
 
+  const origin = getOrigin(req);
+  const sp = new URL(req.url).searchParams;
+  // API key diperiksa setelah batas permintaan, supaya tebak-tebakan key ikut terkena batas itu.
+  const apiKey = keyFromRequest(req, sp);
+  sp.delete("apikey");
+  sp.delete("api_key");
+  if (KEY_REQUIRED) {
+    if (!apiKey) {
+      return fail(
+        401,
+        `API key wajib diisi. Masuk di ${origin}/login untuk mendapat API key gratis, lalu tambahkan parameter apikey=yn-... (atau header x-api-key) ke permintaanmu.`,
+        { ...rlHeaders, "www-authenticate": 'Bearer realm="api"' },
+        { login: `${origin}/login` },
+      );
+    }
+    const verdict = await verifyKey(apiKey);
+    if (verdict === "error") return fail(503, "API key belum bisa diperiksa karena server akun tidak dapat dihubungi. Coba lagi sebentar lagi.", rlHeaders);
+    if (verdict === "banned") return fail(403, `API key ini dinonaktifkan oleh pemilik situs. Untuk banding, hubungi owner lewat WhatsApp ${OWNER_WA}.`, rlHeaders, { appeal: APPEAL_URL });
+    if (verdict !== "ok") {
+      return fail(403, `API key tidak valid atau sudah diganti. Lihat API key kamu yang berlaku di ${origin}/akun.`, rlHeaders, { login: `${origin}/login` });
+    }
+  }
+
   try {
-    const sp = new URL(req.url).searchParams;
-    const result = await endpoint.handler({ req, sp, origin: getOrigin(req) });
+    const result = await endpoint.handler({ req, sp, origin });
     recordHit(key);
 
     if (result instanceof Response) {
-      for (const [k, v] of Object.entries({ ...CORS, ...rlHeaders })) result.headers.set(k, v);
-      return result;
+      let res = result;
+      if (KEY_REQUIRED) {
+        // Tautan di halaman HTML yang menunjuk ke API ini harus ikut membawa API key.
+        if ((res.headers.get("content-type") || "").startsWith("text/html") && res.ok) {
+          res = new Response(withKeyInHtml(await res.text(), origin, apiKey), { status: res.status, headers: res.headers });
+          res.headers.delete("content-length");
+        }
+        // Jawaban tidak boleh disimpan cache bersama: cache seperti itu akan melayani permintaan tanpa API key.
+        const cache = res.headers.get("cache-control");
+        if (cache && /public|s-maxage/i.test(cache)) res.headers.set("cache-control", `private, max-age=${/(?:^|[\s,])max-age=(\d+)/i.exec(cache)?.[1] ?? "0"}`);
+      }
+      for (const [k, v] of Object.entries({ ...CORS, ...rlHeaders })) res.headers.set(k, v);
+      return res;
     }
-    return new NextResponse(JSON.stringify({ status: true, creator: SITE_CREATOR, result }, null, 2), {
+    const body = KEY_REQUIRED ? withKeyInLinks(result, origin, apiKey) : result;
+    return new NextResponse(JSON.stringify({ status: true, creator: SITE_CREATOR, result: body }, null, 2), {
       headers: { "content-type": "application/json; charset=utf-8", ...CORS, ...rlHeaders },
     });
   } catch (e) {

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useApiKey, withKey } from "./auth-client";
 import { CopyButton, useOrigin } from "./client-utils";
 
-type Props = { fallback: string; path: string };
+type Props = { fallback: string; path: string; keyRequired?: boolean };
 
 export function buildSnippets(url: string) {
   return {
@@ -53,9 +54,10 @@ echo $data["result"]["url"];`,
   } as Record<string, string>;
 }
 
-export function CodeTabs({ fallback, path }: Props) {
+export function CodeTabs({ fallback, path, keyRequired = false }: Props) {
   const origin = useOrigin(fallback);
-  const snippets = buildSnippets(`${origin}${path}`);
+  const { shown } = useApiKey(keyRequired);
+  const snippets = buildSnippets(withKey(`${origin}${path}`, shown));
   const tabs = Object.keys(snippets);
   const [tab, setTab] = useState(tabs[0]);
 

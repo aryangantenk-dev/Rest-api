@@ -1,8 +1,9 @@
 import { ImageResponse } from "next/og";
 import { endpoints } from "@/lib/api/registry";
-import { SITE_NAME } from "@/lib/site";
+import { KEY_REQUIRED } from "@/lib/auth/config";
+import { SITE_NAME, SITE_TAGLINE } from "@/lib/site";
 
-export const alt = `${SITE_NAME} — REST API Gratis Tanpa API Key`;
+export const alt = `${SITE_NAME} — ${SITE_TAGLINE}`;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -27,7 +28,7 @@ export default function OgImage() {
           <div style={{ fontSize: 36, fontWeight: 700, display: "flex" }}>{SITE_NAME}</div>
         </div>
         <div style={{ display: "flex", flexDirection: "column" }}>
-          <div style={{ fontSize: 84, fontWeight: 800, lineHeight: 1.05, letterSpacing: -2, display: "flex", flexWrap: "wrap" }}>{endpoints.length} endpoint REST API. Gratis, tanpa API key.</div>
+          <div style={{ fontSize: 84, fontWeight: 800, lineHeight: 1.05, letterSpacing: -2, display: "flex", flexWrap: "wrap" }}>{endpoints.length} endpoint REST API. {KEY_REQUIRED ? "Gratis, cukup satu API key." : "Gratis, tanpa API key."}</div>
           <div style={{ marginTop: 28, fontSize: 30, color: muted, display: "flex" }}>AI, downloader, canvas, data BMKG, Al-Qur&apos;an, komik, anime, dan film dalam satu base URL.</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", borderTop: `2px solid ${line}`, paddingTop: 28, fontSize: 28 }}>

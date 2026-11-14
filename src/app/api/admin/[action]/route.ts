@@ -2,18 +2,24 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { adminBan, adminListBans, adminUnban } from "@/lib/guard";
 import { IMAGE_NAME_RE, hasImageStore, listImages, removeImages } from "@/lib/images";
+import { AUTH_BASE_READY } from "@/lib/auth/config";
+import { forgetAllKeys } from "@/lib/auth/apikey";
+import { adminUsers, normalizeEmail, setBanned } from "@/lib/auth/users";
 import { SITE_CREATOR, getOrigin } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 /**
- * Endpoint khusus owner untuk mengelola blokir IP dan gambar unggahan.
+ * Endpoint khusus owner untuk mengelola blokir IP, gambar unggahan, dan akun pengguna.
  *   /api/admin/bans?key=ADMIN_KEY               daftar IP yang diblokir
  *   /api/admin/unban?ip=1.2.3.4&key=ADMIN_KEY   buka blokir
  *   /api/admin/ban?ip=1.2.3.4&reason=..&key=..  blokir manual
  *   /api/admin/images?key=ADMIN_KEY             100 gambar unggahan terbaru
  *   /api/admin/delimage?name=..&key=ADMIN_KEY   hapus satu gambar unggahan
+ *   /api/admin/users?key=ADMIN_KEY              100 akun terbaru (API key disamarkan)
+ *   /api/admin/userban?email=..&key=ADMIN_KEY   nonaktifkan akun beserta API key-nya
+ *   /api/admin/userunban?email=..&key=..        aktifkan lagi
  * Kunci juga boleh dikirim lewat header `x-admin-key`.
  */
 const json = (status: number, body: Record<string, unknown>) =>
@@ -53,6 +59,18 @@ export async function GET(req: Request, ctx: { params: Promise<{ action: string 
       if (!removed) return json(404, { error: "Gambar tidak ditemukan atau sudah dihapus." });
       return json(200, { result: { name, deleted: true, message: "Gambar dihapus. Salinan di cache bisa masih tampil paling lama satu jam." } });
     }
+    if (action === "users" || action === "userban" || action === "userunban") {
+      if (!AUTH_BASE_READY) return json(503, { error: "Login belum dikonfigurasi di server ini (butuh Supabase dan AUTH_SECRET)." });
+      if (action === "users") return json(200, { result: await adminUsers(100) });
+      const email = normalizeEmail(sp.get("email"));
+      if (!email) return json(400, { error: "Parameter 'email' wajib diisi dengan alamat email akun." });
+      const banned = action === "userban";
+      if (!(await setBanned(email, banned))) return json(404, { error: "Tidak ada akun dengan email itu." });
+      forgetAllKeys();
+      return json(200, {
+        result: { email, banned, message: banned ? "Akun dinonaktifkan. API key-nya berhenti berfungsi paling lama satu menit lagi." : "Akun diaktifkan lagi. API key-nya kembali berfungsi paling lama setengah menit lagi." },
+      });
+    }
     const ip = (sp.get("ip") || "").trim().toLowerCase();
     if (action === "unban" || action === "ban") {
       if (!/^[0-9a-f:.]{3,45}$/.test(ip)) return json(400, { error: "Parameter 'ip' wajib diisi dengan alamat IP yang valid." });
@@ -64,7 +82,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ action: string 
       await adminBan(ip, reason);
       return json(200, { result: { ip, banned: true, reason } });
     }
-    return json(404, { error: "Aksi tidak dikenal. Gunakan: bans, ban, unban, images, delimage." });
+    return json(404, { error: "Aksi tidak dikenal. Gunakan: bans, ban, unban, images, delimage, users, userban, userunban." });
   } catch (e) {
     console.error("[api/admin]", e);
     return json(502, { error: "Gagal menghubungi database atau penyimpanan." });

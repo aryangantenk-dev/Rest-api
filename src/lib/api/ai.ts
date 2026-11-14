@@ -23,7 +23,7 @@ export const aiEndpoints: Endpoint[] = [
   {
     category: "ai", slug: "chat", kind: "json",
     title: "AI Chat",
-    description: "Ngobrol dengan model bahasa AI. Atur kepribadian lewat parameter system. Tanpa API key.",
+    description: "Ngobrol dengan model bahasa AI. Atur kepribadian lewat parameter system.",
     params: [
       { name: "text", required: true, description: "Pertanyaan atau perintah untuk AI.", example: "Jelaskan apa itu REST API dalam 2 kalimat" },
       { name: "system", description: "Instruksi peran/kepribadian AI.", example: "Kamu adalah asisten yang ramah dan menjawab dalam bahasa Indonesia." },

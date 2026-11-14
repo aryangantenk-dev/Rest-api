@@ -13,7 +13,7 @@ export const categories: Category[] = [
     id: "ai",
     name: "Artificial Intelligence",
     tagline: "Chat & generator gambar",
-    description: "Endpoint AI untuk percakapan cerdas dan pembuatan gambar dari teks, tanpa perlu API key.",
+    description: "Endpoint AI untuk percakapan cerdas dan pembuatan gambar dari teks.",
     seoTitle: "REST API AI Gratis: Chat AI & Text to Image",
   },
   {

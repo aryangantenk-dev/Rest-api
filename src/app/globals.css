@@ -217,6 +217,16 @@ select {
 .btn-secondary:hover:not(:disabled) {
   background: var(--subtle);
 }
+/* Aksi yang tidak bisa dibatalkan (mis. mengganti API key). */
+.btn-danger {
+  background: transparent;
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.btn-danger:hover:not(:disabled) {
+  background: var(--danger);
+  color: var(--bg);
+}
 
 /* Tautan teks di dalam paragraf */
 .link {
@@ -490,4 +500,17 @@ details[open] > .faq-body {
 }
 :root[data-theme="dark"] .only-dark {
   display: block;
+}
+
+/* ---------- Tampilan menurut status login ----------
+   Atribut data-signed pada <html> diisi skrip kecil di <head> sebelum halaman digambar
+   (lalu dijaga oleh auth-client), sehingga tombol "Masuk"/"Akun" tidak berkedip saat dimuat. */
+:root .only-signed {
+  display: none;
+}
+:root[data-signed="1"] .only-signed {
+  display: inline-flex;
+}
+:root[data-signed="1"] .only-guest {
+  display: none;
 }

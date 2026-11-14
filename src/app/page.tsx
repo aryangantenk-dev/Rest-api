@@ -11,20 +11,27 @@ import { allMeta } from "@/lib/api/registry";
 import { APPEAL_URL } from "@/lib/guard";
 import { colorizeJson } from "@/lib/highlight";
 import { RATE_LIMIT } from "@/lib/limits";
-import { SITE_CREATOR, SITE_NAME, SITE_URL } from "@/lib/site";
+import { KEY_REQUIRED } from "@/lib/auth/config";
+import { SITE_CREATOR, SITE_NAME, SITE_TAGLINE, SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
 };
 
 const steps = [
-  { t: "Pilih endpoint", d: "Cari fitur yang kamu butuhkan di dokumentasi, lalu lihat parameter yang diperlukan." },
-  { t: "Kirim permintaan GET", d: "Tempel base URL, tambahkan path dan query string. Tidak ada header khusus atau autentikasi." },
+  KEY_REQUIRED
+    ? { t: "Masuk dan ambil API key", d: "Masuk dengan Google atau email. API key gratis langsung dibuat dan tampil di halaman Akun." }
+    : { t: "Pilih endpoint", d: "Cari fitur yang kamu butuhkan di dokumentasi, lalu lihat parameter yang diperlukan." },
+  KEY_REQUIRED
+    ? { t: "Pilih endpoint, kirim GET", d: "Cari fitur di dokumentasi, lalu kirim GET ke base URL ditambah path, parameternya, dan apikey milikmu. Tidak perlu header khusus." }
+    : { t: "Kirim permintaan GET", d: "Tempel base URL, tambahkan path dan query string. Tidak ada header khusus atau autentikasi." },
   { t: "Terima hasilnya", d: "Ambil field result dari JSON, atau langsung tampilkan gambarnya di tag <img>." },
 ];
 
 const features = [
-  { t: "Tanpa API key", d: "Tidak ada pendaftaran, token, atau kuota tersembunyi. Salin URL-nya, langsung jalan." },
+  KEY_REQUIRED
+    ? { t: "API key gratis", d: "Masuk dengan Google atau email dan API key langsung jadi. Tidak ada biaya atau kuota tersembunyi." }
+    : { t: "Tanpa API key", d: "Tidak ada pendaftaran, token, atau kuota tersembunyi. Salin URL-nya, langsung jalan." },
   { t: "CORS terbuka", d: "Panggil dari browser, aplikasi mobile, bot WhatsApp atau Telegram, bahkan dari file HTML lokal." },
   { t: "Format respons seragam", d: "Setiap endpoint JSON mengembalikan status, creator, dan result, jadi parser cukup ditulis sekali." },
   { t: "Playground di setiap endpoint", d: "Ada form uji coba dan contoh kode siap salin untuk cURL, JavaScript, Python, dan PHP." },
@@ -33,7 +40,14 @@ const features = [
 ];
 
 const faqs = [
-  { q: `Apakah ${SITE_NAME} benar-benar gratis dan tanpa API key?`, a: `Ya. Semua endpoint bisa dipanggil langsung tanpa registrasi maupun API key. Untuk menjaga kualitas layanan, berlaku batas ${RATE_LIMIT} permintaan per menit untuk setiap alamat IP. IP yang berulang kali melewati batas akan diblokir dan bisa mengajukan banding ke owner lewat WhatsApp.` },
+  {
+    q: KEY_REQUIRED ? `Apakah ${SITE_NAME} gratis, dan bagaimana cara mendapat API key?` : `Apakah ${SITE_NAME} benar-benar gratis dan tanpa API key?`,
+    a: `${
+      KEY_REQUIRED
+        ? "Gratis. Masuk dengan akun Google atau dengan email (kami kirim kode verifikasi), lalu API key berawalan yn- langsung dibuat untukmu. Sertakan key itu sebagai parameter apikey di setiap permintaan."
+        : "Ya. Semua endpoint bisa dipanggil langsung tanpa registrasi maupun API key."
+    } Untuk menjaga kualitas layanan, berlaku batas ${RATE_LIMIT} permintaan per menit untuk setiap alamat IP. IP yang berulang kali melewati batas akan diblokir dan bisa mengajukan banding ke owner lewat WhatsApp.`,
+  },
   { q: "Bagaimana format respons yang dikembalikan?", a: "Endpoint data mengembalikan JSON dengan pola { status, creator, result }. Bila terjadi kesalahan, kamu menerima { status: false, code, error } disertai kode HTTP yang sesuai. Endpoint kategori Image, Canvas, dan beberapa endpoint tools mengembalikan file gambar PNG secara langsung." },
   { q: "Bolehkah dipakai untuk bot WhatsApp, Telegram, atau Discord?", a: "Tentu. CORS terbuka dan responsnya ringan sehingga cocok dipakai pada bot, aplikasi web, dan proyek hobi. Mohon tidak menyalahgunakannya untuk spam atau aktivitas yang melanggar hukum." },
   { q: "Dari mana data cuaca, gempa, dan jadwal sholat berasal?", a: `Gempa diambil langsung dari BMKG, cuaca dari Open-Meteo, dan jadwal sholat serta Al-Qur'an dari layanan terbuka yang terpercaya. ${SITE_NAME} merapikan datanya agar konsisten dan mudah dipakai.` },
@@ -72,14 +86,14 @@ export default function Home() {
         "@type": "WebPage",
         "@id": `${SITE_URL}/#webpage`,
         url: SITE_URL,
-        name: `${SITE_NAME} — REST API Gratis Tanpa API Key`,
+        name: `${SITE_NAME} — ${SITE_TAGLINE}`,
         isPartOf: { "@id": `${SITE_URL}/#website` },
         inLanguage: "id-ID",
       },
       {
         "@type": "WebAPI",
         name: SITE_NAME,
-        description: "REST API gratis tanpa API key dengan ratusan fitur untuk developer Indonesia.",
+        description: `REST API ${KEY_REQUIRED ? "gratis dengan API key" : "gratis tanpa API key"} dengan ratusan fitur untuk developer Indonesia.`,
         documentation: `${SITE_URL}/docs`,
         url: `${SITE_URL}/api`,
         provider: { "@id": `${SITE_URL}/#org` },
@@ -98,10 +112,10 @@ export default function Home() {
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:grid-rows-[auto_1fr] lg:gap-x-12 lg:gap-y-10">
           <div className="lg:col-span-5">
             <h1 className="font-mono text-[2rem] font-bold leading-[1.15] tracking-tight sm:text-[2.5rem] lg:text-5xl lg:leading-[1.1]">
-              {meta.length} endpoint REST API. Gratis, tanpa API key.
+              {meta.length} endpoint REST API. {KEY_REQUIRED ? "Gratis, cukup satu API key." : "Gratis, tanpa API key."}
             </h1>
             <p className="mt-6 max-w-[60ch] text-lg text-muted">
-              {`${SITE_NAME} menyatukan AI, downloader, canvas, pencarian, data BMKG, Al-Qur'an, komik, anime, dan film dalam satu base URL. Tidak perlu daftar: salin URL, kirim GET, terima JSON.`}
+              {`${SITE_NAME} menyatukan AI, downloader, canvas, pencarian, data BMKG, Al-Qur'an, komik, anime, dan film dalam satu base URL. ${KEY_REQUIRED ? "Masuk sekali untuk mendapat API key gratis, lalu" : "Tidak perlu daftar:"} salin URL, kirim GET, terima JSON.`}
             </p>
 
             <div className="mt-8">
@@ -113,11 +127,20 @@ export default function Home() {
                 Buka dokumentasi
                 <ArrowIcon />
               </Link>
+              {KEY_REQUIRED && (
+                <p className="only-guest mt-3 text-sm text-muted">
+                  Belum punya API key?{" "}
+                  <Link href="/login" className="link font-medium text-fg">
+                    Masuk dengan Google atau email
+                  </Link>
+                  .
+                </p>
+              )}
             </div>
           </div>
 
           <div className="min-w-0 lg:col-span-7 lg:row-span-2">
-            <TryConsole endpoints={consoleList} picks={picks} fallback={SITE_URL} sample={sampleResponse} />
+            <TryConsole endpoints={consoleList} picks={picks} fallback={SITE_URL} sample={sampleResponse} keyRequired={KEY_REQUIRED} />
           </div>
 
           <dl className="grid grid-cols-2 gap-x-6 gap-y-6 self-start border-t border-line pt-6 lg:col-span-5">
@@ -191,7 +214,7 @@ export default function Home() {
           </div>
 
           <div className="min-w-0 space-y-2 lg:col-span-7">
-            <CodeTabs fallback={SITE_URL} path="/api/random/quote" />
+            <CodeTabs fallback={SITE_URL} path="/api/random/quote" keyRequired={KEY_REQUIRED} />
             <div className="bg-code text-codefg">
               <div className="flex min-h-11 items-center gap-4 border-b border-codeline px-4 font-mono text-sm text-codemuted">
                 <span className="inline-flex items-center gap-2 font-semibold text-codeok">

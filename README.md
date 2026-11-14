@@ -1,6 +1,6 @@
 # yanz.api
 
-REST API gratis tanpa API key (163 endpoint) beserta dokumentasi dan playground interaktif. Dibangun dengan Next.js 16 (App Router).
+REST API gratis (163 endpoint) beserta dokumentasi dan playground interaktif. Bisa dijalankan terbuka tanpa API key, atau dengan login (Google / email + kode verifikasi) dan API key berawalan `yn-` untuk setiap pengguna. Dibangun dengan Next.js 16 (App Router).
 
 ## Menjalankan lokal
 
@@ -28,8 +28,46 @@ Kode berada langsung di root repository, jadi Vercel maupun Netlify mendeteksiny
 | `WEB2APK_API_KEY` | Kunci API dari akunmu sendiri di layanan pembuat APK, untuk `/api/tools/web2apk`. Akun gratis mendapat 3 build per hari. Tanpa ini endpoint berjalan sebagai tamu (1 build per hari per alamat IP server), lalu menjawab 429. |
 | `IMAGE_TTL_DAYS` | Berapa hari gambar unggahan (`/api/tools/tourl`) disimpan sebelum dihapus otomatis. Default `30`; `0` berarti selamanya. Fitur ini butuh `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`. |
 | `IMAGE_BUCKET` | Nama bucket Supabase Storage untuk gambar unggahan. Default `yanz-images`; dibuat otomatis. |
+| `AUTH_SECRET` | Kunci acak minimal 32 karakter untuk menandatangani sesi login dan kode verifikasi. Wajib agar login aktif. |
+| `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` | Mengaktifkan login Google. Alamat balik yang didaftarkan di Google: `<domain>/auth/google/callback`. |
+| `SMTP_USER` + `SMTP_PASS` | Mengaktifkan login email dengan kode verifikasi. Untuk Gmail isi alamat Gmail dan App password. `SMTP_HOST` (default `smtp.gmail.com`), `SMTP_PORT` (default `465`), dan `MAIL_FROM` opsional. |
+| `OTP_MAX_PER_HOUR` | Batas email kode per jam untuk seluruh situs. Default `100`. |
+| `REQUIRE_API_KEY` | Isi `0` untuk membuka endpoint tanpa API key walau login aktif. |
 
 Tanpa database, semua endpoint lain tetap berjalan normal. Lihat `.env.example`. Status database bisa dicek di `/api/health`.
+
+## Login dan API key
+
+Login aktif bila tiga hal ini terpenuhi: Supabase terpasang (`supabase/schema.sql` sudah dijalankan), `AUTH_SECRET` terisi, dan minimal satu cara masuk dikonfigurasi (Google atau email). **Begitu login aktif, semua endpoint `/api/<kategori>/<nama>` menolak permintaan tanpa API key.** Selama belum lengkap, endpoint tetap terbuka dan tombol Masuk tidak ditampilkan.
+
+- **Masuk / daftar** di `/login`: dengan Google, atau dengan email yang dipastikan lewat kode 6 angka (berlaku 10 menit, sekali pakai, maksimal 5 kali salah). Akun dibuat otomatis saat pertama kali masuk. Akun dikenali dari alamat emailnya, jadi masuk lewat Google dan lewat email dengan alamat yang sama membuka akun yang sama.
+- **API key** dibuat saat akun dibuat. Bentuknya `yn-` diikuti 32 karakter acak: huruf besar, huruf kecil, angka, dan tiga simbol `_`, `.`, `-`. Contoh: `yn-7Kq2fXz9_Lm4RtHv3.pNc6Wd1J-b5YeQa0`. Hanya tiga simbol itu yang dipakai karena aman ditulis apa adanya di URL.
+- **Mengirim API key**: parameter `?apikey=yn-...`, header `x-api-key: yn-...`, atau `Authorization: Bearer yn-...`.
+- **Halaman `/akun`**: lihat, salin, dan ganti API key; keluar.
+- **Dokumentasi**: kolom API key di `/docs` terisi otomatis selama pengguna masuk, dan ikut tertulis di URL serta contoh kode setiap endpoint.
+- Tautan di dalam respons yang menunjuk ke API ini sendiri (`cek`, `next`, proxy gambar komik, halaman player) otomatis membawa API key pemanggilnya.
+
+Jawaban bila API key bermasalah:
+
+| Kode | Arti |
+| --- | --- |
+| `401` | API key tidak dikirim. |
+| `403` | API key tidak dikenal, sudah diganti, atau akunnya dinonaktifkan. |
+| `503` | Server akun tidak dapat dihubungi, jadi API key belum bisa diperiksa. |
+
+Hasil pemeriksaan API key disimpan sementara di memori server (60 detik), jadi key yang diganti atau akun yang dinonaktifkan bisa masih diterima paling lama satu menit.
+
+Yang **tidak** butuh API key: `/api` (indeks), `/api/stats`, `/api/health`, tautan pendek `/s/<kode>`, dan gambar unggahan `/i/<nama>`.
+
+Untuk owner (butuh `ADMIN_KEY`):
+
+```
+/api/admin/users?key=ADMIN_KEY                    100 akun terbaru (API key disamarkan)
+/api/admin/userban?email=a@b.com&key=ADMIN_KEY    nonaktifkan akun dan API key-nya
+/api/admin/userunban?email=a@b.com&key=ADMIN_KEY  aktifkan lagi
+```
+
+Data akun ada di tabel `api_users`; kode verifikasi di `auth_otps` (yang disimpan hanya hash-nya). Sesi login adalah cookie bertanda tangan yang berlaku 30 hari.
 
 ## Batas pemakaian dan blokir IP
 
